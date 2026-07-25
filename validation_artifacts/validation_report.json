@@ -1,0 +1,210 @@
+{
+  "summary": {
+    "seed": 3302,
+    "simulation_days": 731,
+    "components": 21,
+    "local_areas": 2,
+    "checks_passed": 27,
+    "checks_total": 27,
+    "baseline_kpis": {
+      "reliability_fraction": 0.9999999999999999,
+      "total_unmet_ml": 8.882505841967259e-12,
+      "mean_annual_leakage_ml": 18675.834650126995,
+      "mean_annual_ghg_net_kg_co2e": 164387952.98280588,
+      "mean_annual_acidification_net_kg_so2e": 75694.70889696009,
+      "mean_annual_eutrophication_net_kg_po4e": 11708264.917335982,
+      "present_total_cost_eur": 147053762.14286378,
+      "total_energy_generated_kwh": 136456969.12441313,
+      "mean_annual_expected_failures": 68.01403594206833,
+      "mean_annual_flooded_area_m2_days": 15175152.886040673,
+      "mean_annual_aquifer_recharge_ml": 60611.83244566061,
+      "mean_annual_imported_water_ml": 0.0,
+      "mean_annual_exported_water_ml": 0.0,
+      "mean_annual_cso_ml": 0.0,
+      "mean_annual_untreated_wastewater_ml": 0.0,
+      "risk_R01HZ01_probability": 0.9384404924760602,
+      "risk_R01HZ01_score": 8.882505841967259e-09,
+      "risk_R01HZ02_probability": 0.006839945280437756,
+      "risk_R01HZ02_score": 2380900.0,
+      "risk_R01HZ03_probability": 1.0,
+      "risk_R01HZ03_score": 2488344.6841135086,
+      "risk_R01HZ04_probability": 0.9384404924760602,
+      "risk_R01HZ04_score": 8.882505841967259e-12,
+      "risk_R01HZ05_probability": 1.0,
+      "risk_R01HZ05_score": 13834041.753197338,
+      "risk_R02HZ01_probability": 0.0,
+      "risk_R02HZ01_score": 0.0,
+      "risk_R03HZ01_probability": 0.0,
+      "risk_R03HZ01_score": 0.0,
+      "risk_R03HZ02_probability": 0.0,
+      "risk_R03HZ02_score": 0.0,
+      "risk_R05HZ01_probability": 0.0,
+      "risk_R05HZ01_score": 0.0,
+      "risk_R07HZ01_probability": 0.17373461012311903,
+      "risk_R07HZ01_score": 30269156.203329664,
+      "risk_R07HZ02_probability": 0.17373461012311903,
+      "risk_R07HZ02_score": 30269156.203329664,
+      "risk_R08HZ03_probability": 0.0,
+      "risk_R08HZ03_score": 0.0,
+      "risk_R08HZ04_probability": 1.0,
+      "risk_R08HZ04_score": 17279.6097944593,
+      "risk_R08HZ05_probability": 1.0,
+      "risk_R08HZ05_score": 224529.2767723115,
+      "risk_R08HZ06_probability": 1.0,
+      "risk_R08HZ06_score": 135.93496574321662,
+      "risk_R08HZ07_probability": 1.0,
+      "risk_R08HZ07_score": 66.92789075552645,
+      "risk_R08HZ08_probability": 1.0,
+      "risk_R08HZ08_score": 66.92789075552645,
+      "risk_R08HZ09_probability": 0.7400820793433652,
+      "risk_R08HZ09_score": 26286.546070641118,
+      "risk_R08HZ11_probability": 0.9384404924760602,
+      "risk_R08HZ11_score": 8.882505841967259e-12,
+      "risk_R08HZ12_probability": 0.2982216142270862,
+      "risk_R08HZ12_score": 4043.8443330115624,
+      "risk_R08HZ13_probability": 0.9384404924760602,
+      "risk_R08HZ13_score": 8.882505841967259e-12,
+      "risk_R09HZ01_probability": 0.17373461012311903,
+      "risk_R09HZ01_score": 30.329532119944393,
+      "risk_R09HZ02_probability": 0.17373461012311903,
+      "risk_R09HZ02_score": 30269156.203329664
+    }
+  },
+  "checks": [
+    {
+      "name": "全部组件族被执行",
+      "passed": true,
+      "detail": "执行 10 类组件、21 个组件"
+    },
+    {
+      "name": "回用尺度与排水制式覆盖",
+      "passed": true,
+      "detail": "reuse=['local', 'subcatchment', 'system'], sewer=['combined', 'sanitary', 'storm']"
+    },
+    {
+      "name": "四级层级与逐边供水拓扑",
+      "passed": true,
+      "detail": "Indoor=1, Subcatchment=2, 自动路径=4"
+    },
+    {
+      "name": "所有组件均有实际活动",
+      "passed": true,
+      "detail": "最小累计入流=2040.052132 ML"
+    },
+    {
+      "name": "官方气象字段与指定集雨面被执行",
+      "passed": true,
+      "detail": "降水类型=3, RWH收集=10906.2 ML"
+    },
+    {
+      "name": "逐日需求质量守恒",
+      "passed": true,
+      "detail": "最大绝对残差=5.862e-14 ML"
+    },
+    {
+      "name": "水源跨期质量守恒",
+      "passed": true,
+      "detail": "最大绝对残差=8.440e-10 ML"
+    },
+    {
+      "name": "排水/处理/回用储量守恒",
+      "passed": true,
+      "detail": "最大绝对残差=1.978e-11 ML"
+    },
+    {
+      "name": "环境影响净值恒等式",
+      "passed": true,
+      "detail": "最大绝对残差=0.000e+00"
+    },
+    {
+      "name": "分期干预按日期生效",
+      "passed": true,
+      "detail": "干预前=0.343, 干预后=0.500 kWh/m3"
+    },
+    {
+      "name": "全部管网修复方法被执行",
+      "passed": true,
+      "detail": "执行方法=['pipe_cracking_lining', 'polyurethane_lining', 'rebuild_ductile_iron', 'slip_lining_pe']"
+    },
+    {
+      "name": "年度修复率与oldest-first资产队列",
+      "passed": true,
+      "detail": "自动修复事件=1, P2管龄组=3"
+    },
+    {
+      "name": "污染物/化学品/资源回收覆盖",
+      "passed": true,
+      "detail": "污染物=['BOD', 'COD', 'TN', 'TP', 'TSS', 'treatment_residuals'], 化学品=15, 回收品=10"
+    },
+    {
+      "name": "WTW污泥及CSO/外渗污染物",
+      "passed": true,
+      "detail": "WTW污泥=3195369.9 kg, 排水污染物流=['cso', 'exfiltration', 'outflow']"
+    },
+    {
+      "name": "回用污染物去除率正确",
+      "passed": true,
+      "detail": "最大比例残差=1.110e-16"
+    },
+    {
+      "name": "发电量计算正确",
+      "passed": true,
+      "detail": "最大绝对残差=1.819e-12 kWh"
+    },
+    {
+      "name": "地下水补给与洪涝面积/流速模型",
+      "passed": true,
+      "detail": "补给=121140.7 ML，淹没面积日=30329532.1 m2-day"
+    },
+    {
+      "name": "23项官方风险代码完整计算",
+      "passed": true,
+      "detail": "风险代码=23，逐日记录=16813"
+    },
+    {
+      "name": "资产失效与生命周期成本",
+      "passed": true,
+      "detail": "期望失效=135.935，维护成本=600410.7 EUR"
+    },
+    {
+      "name": "用水设备能耗与运维成本",
+      "passed": true,
+      "detail": "设备电耗=566331.0 kWh，设备运维=140.1 EUR"
+    },
+    {
+      "name": "错误输入被拒绝",
+      "passed": true,
+      "detail": "错误分配=True, 缺日=True"
+    },
+    {
+      "name": "校准找回已知真值",
+      "passed": true,
+      "detail": "a=0.20, runoff=0.14, NSE=1.000000"
+    },
+    {
+      "name": "不确定性分析可复现且分位数有序",
+      "passed": true,
+      "detail": "样本数=12, seed=3302"
+    },
+    {
+      "name": "情景方向与极端缺水响应正确",
+      "passed": true,
+      "detail": "漏损 18675.8->13925.1 ML/yr；干旱缺水=13910.2 ML"
+    },
+    {
+      "name": "多准则排序完整且距离单调",
+      "passed": true,
+      "detail": "排序=Enhanced reuse > Leakage reduction > BAU"
+    },
+    {
+      "name": "Python Toolkit读写运行检索",
+      "passed": true,
+      "detail": "结果表=12, 组件=21"
+    },
+    {
+      "name": "多目标Pareto优化",
+      "passed": true,
+      "detail": "试验=2, Pareto解=1"
+    }
+  ]
+}

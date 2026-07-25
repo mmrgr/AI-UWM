@@ -1,0 +1,11 @@
+{
+  "decisions": {
+    "components.DM1.leakage_fraction": [0.12, 0.18, 0.22],
+    "components.RWH_LOCAL.collection_fraction": [0.5, 0.8]
+  },
+  "objectives": {
+    "mean_annual_leakage_ml": "min",
+    "mean_annual_ghg_net_kg_co2e": "min",
+    "present_total_cost_eur": "min"
+  }
+}

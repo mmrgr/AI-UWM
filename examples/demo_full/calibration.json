@@ -1,0 +1,11 @@
+{
+  "observed_column": "observed_sewer_outflow_ml",
+  "result_table": "component_daily",
+  "result_column": "outflow_ml",
+  "selector": "component_id=SEWER1",
+  "objective": "nse",
+  "parameters": {
+    "components.SEWER1.release_a": [0.16, 0.20, 0.24],
+    "local_areas.LA1.surfaces.pervious.runoff_coefficient": [0.10, 0.14, 0.18]
+  }
+}

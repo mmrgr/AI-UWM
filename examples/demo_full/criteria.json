@@ -1,0 +1,6 @@
+{
+  "reliability_fraction": {"goal": "max", "weight": 0.35},
+  "mean_annual_ghg_net_kg_co2e": {"goal": "min", "weight": 0.25},
+  "mean_annual_eutrophication_net_kg_po4e": {"goal": "min", "weight": 0.20},
+  "present_total_cost_eur": {"goal": "min", "weight": 0.20}
+}

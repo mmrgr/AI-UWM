@@ -1,0 +1,9 @@
+{
+  "samples": 20,
+  "seed": 2026,
+  "parameters": [
+    {"path": "components.DM1.leakage_fraction", "distribution": "triangular", "low": 0.16, "mode": 0.22, "high": 0.28},
+    {"path": "local_areas.LA1.annual_population_growth", "distribution": "uniform", "low": 0.01, "high": 0.03},
+    {"path": "components.WWTW1.direct_emissions.n2o_kg_m3", "distribution": "lognormal", "mean_log": -5.52, "sd_log": 0.25}
+  ]
+}

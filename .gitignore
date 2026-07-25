@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+tmp/
+*.egg-info/
+artifacts/
+output/
+references/*.pdf
+validation_artifacts/*
+!validation_artifacts/VALIDATION_REPORT_CN.md
+!validation_artifacts/validation_report.json

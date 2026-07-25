@@ -1,0 +1,96 @@
+{
+  "provenance": {
+    "paper": "Behzadian and Kapelan (2015), Tables 5-6 and Sections 3.1-3.3",
+    "manual": "TRUST Deliverable D33.2, Chapter 5 and Appendices A-B",
+    "note": "Daily SCADA, weather and reservoir inflow records were not published. The input generator creates deterministic proxies preserving published annual magnitudes."
+  },
+  "simulation": {
+    "start": "2011-01-01",
+    "end": "2040-12-31",
+    "random_seed": 3302
+  },
+  "city": {
+    "households_2011": 320000,
+    "occupancy": 2.35,
+    "area_ha": 16901,
+    "roof_fraction": 0.0946,
+    "road_pavement_fraction": 0.0677,
+    "pervious_fraction": 0.8377,
+    "impervious_runoff_coefficient": 0.95,
+    "pervious_infiltration_coefficient": 0.30
+  },
+  "demand": {
+    "indoor_l_per_capita_day": 180.0,
+    "industrial_ml_day": 54.795,
+    "irrigation_ml_day_active": 63.5,
+    "frost_tapping_ml_day_active": 35.0,
+    "unregistered_l_per_capita_day": 15.0,
+    "return_to_sewer_fraction": 0.95,
+    "growth_2011_2030": 1.02,
+    "growth_2031_2040": 1.01,
+    "monthly_coefficients": [1.02, 0.98, 0.98, 0.97, 0.98, 1.01, 1.06, 1.05, 1.02, 1.00, 0.97, 0.96],
+    "indoor_split": {
+      "dishwasher": 0.032,
+      "hand_basin": 0.12,
+      "kitchen_sink": 0.128,
+      "washing_machine": 0.16,
+      "shower": 0.25,
+      "toilet": 0.30
+    }
+  },
+  "water_supply": {
+    "distribution_leakage_fraction": 0.22,
+    "resources": [
+      {"name": "WR1", "capacity_ml": 120000.0, "initial_ml": 60000.0, "mean_inflow_mcm_year": 287.0, "allocation": 0.90, "wtw_capacity_ml_day": 370.0},
+      {"name": "WR2", "capacity_ml": 13800.0, "initial_ml": 6900.0, "mean_inflow_mcm_year": 12.0, "allocation": 0.10, "wtw_capacity_ml_day": 43.2}
+    ],
+    "new_resource": {
+      "start": "2020-01-01",
+      "capacity_ml": 13000000.0,
+      "daily_inflow_ml": 2000.0,
+      "wtw_capacity_ml_day": 130.0
+    }
+  },
+  "wastewater": {
+    "sewer_storage_ml": 2200.0,
+    "sewer_release_a": 0.20,
+    "sewer_release_b": 1.0,
+    "sewer_daily_capacity_ml": 1090.0,
+    "wwtw1_fraction": 0.63,
+    "wwtw1_capacity_ml_day": 770.0,
+    "wwtw2_capacity_ml_day": 320.0,
+    "removal_fraction": {"cod": 0.85, "nitrogen": 0.70, "phosphorus": 0.90}
+  },
+  "recycling": {
+    "start": "2015-01-01",
+    "adoption_fraction": 0.50,
+    "rwh_tank_m3_per_household": 3.0,
+    "rwh_electricity_kwh_m3": 0.54,
+    "rwh_fixed_eur_household_year": 72.0,
+    "gwr_tank_ml": 39.0,
+    "gwr_electricity_kwh_m3": 1.84,
+    "gwr_fixed_eur_year": 1500000.0
+  },
+  "component_intensity": {
+    "wtw": {"electricity_kwh_m3": 0.343, "diesel_l_m3": 0.00240, "fixed_eur_year": 13400000.0, "chemical_eur_m3": 0.017},
+    "distribution": {"electricity_kwh_m3": 0.44, "diesel_l_m3": 0.00398, "fixed_eur_year": 13940000.0},
+    "sewer": {"electricity_kwh_m3": 0.018, "diesel_l_m3": 0.00059, "fixed_eur_year": 10920000.0},
+    "wwtw": {"electricity_kwh_m3": 0.462, "diesel_l_m3": 0.000064, "fixed_eur_year": 10920000.0, "chemical_eur_m3": 0.027}
+  },
+  "impact_factors": {
+    "electricity": {"ghg_kg_co2e_kwh": 0.21, "acid_kg_so2e_kwh": 0.00049, "eutro_kg_po4e_kwh": 0.000156},
+    "diesel": {"density_kg_l": 0.832, "ghg_kg_co2e_kg": 3.99, "acid_kg_so2e_kg": 0.0106, "eutro_kg_po4e_kg": 0.000848},
+    "wwtw_direct": {"ch4_kg_co2e_m3": 0.50, "n2o_kg_co2e_m3": 1.31},
+    "pollutant": {
+      "sanitary_cod_kg_capita_day": 0.11,
+      "sanitary_n_kg_capita_day": 0.011,
+      "sanitary_p_kg_capita_day": 0.002,
+      "runoff_cod_mg_l": 60.0,
+      "runoff_n_mg_l": 2.0,
+      "runoff_p_mg_l": 0.30,
+      "n_to_po4e": 4.4,
+      "cod_to_po4e": 1.0,
+      "p_to_po4e": 1.0
+    }
+  }
+}

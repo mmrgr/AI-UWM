@@ -1,0 +1,61 @@
+{
+  "characterisation": {
+    "gwp100": {"co2": 1.0, "ch4": 25.0, "n2o": 298.0},
+    "acidification": {"nh3": 2.45, "no2": 0.56},
+    "eutrophication": {"nh3": 3.8, "nitrate": 4.4, "cod": 1.0},
+    "pollutant_to_po4e": {"COD": 1.0, "BOD": 1.0, "TN": 4.4, "TP": 1.0, "NH3": 3.8}
+  },
+  "energy_sources": {
+    "electricity": {"unit": "kWh", "ghg_kg_co2e_unit": 0.21, "acid_kg_so2e_unit": 0.00049, "eutro_kg_po4e_unit": 0.000156, "cost_eur_unit": 0.0854},
+    "diesel": {"unit": "L", "energy_kwh_unit": 9.984, "ghg_kg_co2e_unit": 3.31968, "acid_kg_so2e_unit": 0.0088192, "eutro_kg_po4e_unit": 0.000705536, "cost_eur_unit": 1.15},
+    "coal": {"unit": "kg", "energy_kwh_unit": 8.0, "ghg_kg_co2e_unit": 2.94, "acid_kg_so2e_unit": 0.0239, "eutro_kg_po4e_unit": 0.000985},
+    "fuel_oil": {"unit": "kg", "energy_kwh_unit": 11.39, "ghg_kg_co2e_unit": 3.77, "acid_kg_so2e_unit": 0.0168, "eutro_kg_po4e_unit": 0.00136},
+    "gasoline": {"unit": "kg", "energy_kwh_unit": 13.33, "ghg_kg_co2e_unit": 3.66, "acid_kg_so2e_unit": 0.0286, "eutro_kg_po4e_unit": 0.0059},
+    "lpg": {"unit": "kg", "energy_kwh_unit": 12.9, "ghg_kg_co2e_unit": 3.59, "acid_kg_so2e_unit": 0.00753, "eutro_kg_po4e_unit": 0.000778},
+    "natural_gas": {"unit": "kg", "energy_kwh_unit": 10.6, "ghg_kg_co2e_unit": 3.4, "acid_kg_so2e_unit": 0.0343, "eutro_kg_po4e_unit": 0.000421},
+    "wood": {"unit": "kg", "energy_kwh_unit": 4.17, "ghg_kg_co2e_unit": 0.00024, "acid_kg_so2e_unit": 0.00000173, "eutro_kg_po4e_unit": 0.000000321}
+  },
+  "materials": {
+    "PVC": {"density_kg_m3": 1400, "embodied_energy_kwh_kg": 0.9, "ghg_kg_co2e_kg": 2.36, "acid_kg_so2e_kg": 0.00725, "eutro_kg_po4e_kg": 0.00087},
+    "PE": {"density_kg_m3": 920, "embodied_energy_kwh_kg": 0.9, "ghg_kg_co2e_kg": 2.34, "acid_kg_so2e_kg": 0.0179, "eutro_kg_po4e_kg": 0.00382},
+    "mild_steel": {"density_kg_m3": 7850, "embodied_energy_kwh_kg": 26.67, "ghg_kg_co2e_kg": 6.5, "acid_kg_so2e_kg": 0.00605, "eutro_kg_po4e_kg": 0.0115},
+    "ductile_iron": {"density_kg_m3": 7100, "embodied_energy_kwh_kg": 10.56, "ghg_kg_co2e_kg": 3.4, "acid_kg_so2e_kg": 0.0166, "eutro_kg_po4e_kg": 0.00173},
+    "grey_cast_iron": {"density_kg_m3": 7200, "embodied_energy_kwh_kg": 6.94, "ghg_kg_co2e_kg": 3.34, "acid_kg_so2e_kg": 0.0163, "eutro_kg_po4e_kg": 0.0169},
+    "concrete": {"density_kg_m3": 2400, "embodied_energy_kwh_kg": 0.1, "ghg_kg_co2e_kg": 0.125, "acid_kg_so2e_kg": 0.00024, "eutro_kg_po4e_kg": 0.0000796},
+    "epoxy_resin": {"density_kg_m3": 1200, "embodied_energy_kwh_kg": 6.39, "ghg_kg_co2e_kg": 6.7, "acid_kg_so2e_kg": 0.04, "eutro_kg_po4e_kg": 0.0064},
+    "polyurethane": {"density_kg_m3": 1200, "embodied_energy_kwh_kg": 0.49, "ghg_kg_co2e_kg": 4.3, "acid_kg_so2e_kg": 0.00853, "eutro_kg_po4e_kg": 0.00308},
+    "copper": {"density_kg_m3": 8960, "embodied_energy_kwh_kg": 5.56, "ghg_kg_co2e_kg": 2.33, "acid_kg_so2e_kg": 0.141, "eutro_kg_po4e_kg": 0.166},
+    "polypropylene": {"density_kg_m3": 900, "embodied_energy_kwh_kg": 0.73, "ghg_kg_co2e_kg": 1.16, "acid_kg_so2e_kg": 0.00516, "eutro_kg_po4e_kg": 0.00308}
+  },
+  "chemicals": {
+    "alum": {"embodied_energy_kwh_kg": 0.89, "ghg_kg_co2e_kg": 0.49, "acid_kg_so2e_kg": 0.0101, "eutro_kg_po4e_kg": 0.00141},
+    "carbon_dioxide": {"embodied_energy_kwh_kg": 1.4, "ghg_kg_co2e_kg": 0.794, "acid_kg_so2e_kg": 0.00204, "eutro_kg_po4e_kg": 0.00109},
+    "calcium_hydroxide": {"embodied_energy_kwh_kg": 1.0, "ghg_kg_co2e_kg": 0.763, "acid_kg_so2e_kg": 0.00069, "eutro_kg_po4e_kg": 0.00016},
+    "pax": {"embodied_energy_kwh_kg": 2.79, "ghg_kg_co2e_kg": 1.14, "acid_kg_so2e_kg": 0.00606, "eutro_kg_po4e_kg": 0.00319},
+    "sodium_hypochlorite": {"embodied_energy_kwh_kg": 6.0, "ghg_kg_co2e_kg": 5.63, "acid_kg_so2e_kg": 0.0277, "eutro_kg_po4e_kg": 0.0173},
+    "chlorine": {"embodied_energy_kwh_kg": 1.0, "ghg_kg_co2e_kg": 1.05, "acid_kg_so2e_kg": 0.0529, "eutro_kg_po4e_kg": 0.00356},
+    "ferric_chloride": {"embodied_energy_kwh_kg": 1.39, "ghg_kg_co2e_kg": 0.26, "acid_kg_so2e_kg": 0.00424, "eutro_kg_po4e_kg": 0.0291},
+    "ferric_sulphate": {"embodied_energy_kwh_kg": 2.0, "ghg_kg_co2e_kg": 0.37, "acid_kg_so2e_kg": 0.00093, "eutro_kg_po4e_kg": 0.000085},
+    "nitric_acid": {"embodied_energy_kwh_kg": 3.31, "ghg_kg_co2e_kg": 6.3, "acid_kg_so2e_kg": 0.0173, "eutro_kg_po4e_kg": 0.00428},
+    "methanol": {"embodied_energy_kwh_kg": 4.56, "ghg_kg_co2e_kg": 0.736, "acid_kg_so2e_kg": 0.00125, "eutro_kg_po4e_kg": 0.00040},
+    "ethanol": {"embodied_energy_kwh_kg": 0.83, "ghg_kg_co2e_kg": 1.23, "acid_kg_so2e_kg": 0.00361, "eutro_kg_po4e_kg": 0.00171},
+    "sodium_hydroxide": {"embodied_energy_kwh_kg": 0.0, "ghg_kg_co2e_kg": 2.18, "acid_kg_so2e_kg": 0.0107, "eutro_kg_po4e_kg": 0.0074},
+    "potassium_permanganate": {"embodied_energy_kwh_kg": 2.16, "ghg_kg_co2e_kg": 1.16, "acid_kg_so2e_kg": 0.00516, "eutro_kg_po4e_kg": 0.00308},
+    "ozone": {"embodied_energy_kwh_kg": 15.58, "ghg_kg_co2e_kg": 7.99, "acid_kg_so2e_kg": 0.0384, "eutro_kg_po4e_kg": 0.0267},
+    "microsand": {"embodied_energy_kwh_kg": 0.06, "ghg_kg_co2e_kg": 0.021, "acid_kg_so2e_kg": 0.0000582, "eutro_kg_po4e_kg": 0.0000105}
+  },
+  "byproducts": {
+    "ammonium_nitrate": {"embodied_energy_kwh_unit": 2.72, "ghg_kg_co2e_unit": 2.97, "acid_kg_so2e_unit": 0.00237, "eutro_kg_po4e_unit": 0.00843},
+    "single_superphosphate": {"embodied_energy_kwh_unit": 0.575, "ghg_kg_co2e_unit": 0.548, "acid_kg_so2e_unit": 0.00248, "eutro_kg_po4e_unit": 0.00941},
+    "urea": {"embodied_energy_kwh_unit": 4.81, "ghg_kg_co2e_unit": 1.52, "acid_kg_so2e_unit": 0.0175, "eutro_kg_po4e_unit": 0.00579},
+    "biogas": {"embodied_energy_kwh_unit": 0.0, "ghg_kg_co2e_unit": 0.0, "acid_kg_so2e_unit": 0.0, "eutro_kg_po4e_unit": 0.0},
+    "generated_electricity": {"embodied_energy_kwh_unit": 0.0, "ghg_kg_co2e_unit": 0.21, "acid_kg_so2e_unit": 0.00049, "eutro_kg_po4e_unit": 0.000156},
+    "recovered_heat": {"embodied_energy_kwh_unit": 0.0, "ghg_kg_co2e_unit": 0.21, "acid_kg_so2e_unit": 0.00049, "eutro_kg_po4e_unit": 0.000156}
+  },
+  "rehabilitation_methods": {
+    "slip_lining_pe": {"material": "PE", "thickness_ratio": 0.09, "cost_eur_m_by_size": {"small": 275, "medium": 526, "large": 1242}, "diesel_l_m_by_size": {"small": 1.0, "medium": 1.5, "large": 2.0}},
+    "polyurethane_lining": {"material": "polyurethane", "thickness_ratio": 0.045, "cost_eur_m_by_size": {"small": 137.5, "medium": 263, "large": 621}, "diesel_l_m_by_size": {"small": 0.5, "medium": 0.75, "large": 1.0}},
+    "pipe_cracking_lining": {"material": "PE", "thickness_ratio": 0.09, "cost_eur_m_by_size": {"small": 412.5, "medium": 789, "large": 1863}, "diesel_l_m_by_size": {"small": 1.5, "medium": 2.25, "large": 3.0}},
+    "rebuild_ductile_iron": {"material": "ductile_iron", "thickness_ratio": 0.09, "cost_eur_m_by_size": {"small": 1375, "medium": 2630, "large": 6210}, "diesel_l_m_by_size": {"small": 10.0, "medium": 15.0, "large": 20.0}}
+  }
+}
