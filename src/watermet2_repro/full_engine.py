@@ -228,6 +228,9 @@ class FullModelResult:
         for name, (frame, identifiers) in tables.items():
             if frame.empty:
                 continue
+            _aggregate_frame(frame, "W-MON", identifiers).to_csv(
+                output / f"{name}_weekly.csv", index=False
+            )
             _aggregate_frame(frame, "MS", identifiers).to_csv(
                 output / f"{name}_monthly.csv", index=False
             )

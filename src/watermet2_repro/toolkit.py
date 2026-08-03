@@ -7,7 +7,8 @@ from typing import Any
 
 import pandas as pd
 
-from .full_engine import FullModelResult, FullWaterMet2Model, load_project
+from .analysis import DecisionProblemResult, evaluate_decision_problem
+from .full_engine import FullModelResult, FullWaterMet2Model, _aggregate_frame, load_project
 from .validation import prepare_project, validate_project
 
 
@@ -56,6 +57,34 @@ class WaterMet2Toolkit:
             target[key] = value
         self.result = None
 
+    def get_timeseries(
+        self,
+        columns: list[str] | None = None,
+        *,
+        start: str | pd.Timestamp | None = None,
+        end: str | pd.Timestamp | None = None,
+    ) -> pd.DataFrame:
+        frame = self.timeseries.copy()
+        if start is not None:
+            frame = frame[pd.to_datetime(frame["date"]) >= pd.Timestamp(start)]
+        if end is not None:
+            frame = frame[pd.to_datetime(frame["date"]) <= pd.Timestamp(end)]
+        if columns is not None:
+            requested = ["date", *[name for name in columns if name != "date"]]
+            frame = frame[requested]
+        return frame.reset_index(drop=True)
+
+    def set_timeseries_column(self, column: str, values: Any) -> None:
+        if column == "date":
+            raise ValueError("date column cannot be replaced through set_timeseries_column")
+        if not pd.api.types.is_list_like(values) or isinstance(values, (str, bytes)):
+            self.timeseries[column] = values
+        else:
+            if len(values) != len(self.timeseries):
+                raise ValueError("timeseries column length must match the simulation series")
+            self.timeseries[column] = list(values)
+        self.result = None
+
     def validate(self) -> None:
         validate_project(self.project, self.timeseries)
 
@@ -84,6 +113,9 @@ class WaterMet2Toolkit:
         indoor_id: str | None = None,
         risk_code: str | None = None,
         columns: list[str] | None = None,
+        start: str | pd.Timestamp | None = None,
+        end: str | pd.Timestamp | None = None,
+        frequency: str = "daily",
     ) -> pd.DataFrame:
         if self.result is None:
             raise RuntimeError("尚未运行模型")
@@ -100,9 +132,52 @@ class WaterMet2Toolkit:
                 if column not in frame:
                     raise KeyError(f"结果表 {table} 不含筛选字段 {column}")
                 frame = frame[frame[column].astype(str) == str(value)]
+        if start is not None:
+            frame = frame[pd.to_datetime(frame["date"]) >= pd.Timestamp(start)]
+        if end is not None:
+            frame = frame[pd.to_datetime(frame["date"]) <= pd.Timestamp(end)]
+        frequencies = {
+            "daily": None,
+            "weekly": "W-MON",
+            "monthly": "MS",
+            "annual": "YS",
+        }
+        if frequency not in frequencies:
+            raise ValueError("frequency must be daily, weekly, monthly, or annual")
+        if frequencies[frequency] is not None:
+            identifier_candidates = (
+                "subcatchment_id", "area_id", "indoor_id", "local_area",
+                "component_id", "kind", "stream", "pollutant", "product",
+                "unit", "asset_id", "risk_code",
+            )
+            identifiers = [name for name in identifier_candidates if name in frame]
+            frame = _aggregate_frame(frame, frequencies[frequency], identifiers)
         return frame[columns].copy() if columns else frame
+
+    def get_result_value(
+        self,
+        table: str,
+        column: str,
+        *,
+        aggregation: str = "sum",
+        **filters: Any,
+    ) -> float:
+        frame = self.get_result(table, columns=[column], **filters)
+        if aggregation not in {"sum", "mean", "min", "max", "last"}:
+            raise ValueError("unsupported aggregation")
+        if frame.empty:
+            raise ValueError("result selection is empty")
+        return float(getattr(frame[column], aggregation)())
 
     def write_results(self, output_dir: str | Path) -> None:
         if self.result is None:
             raise RuntimeError("尚未运行模型")
         self.result.write(output_dir)
+
+    def evaluate_decision_problem(
+        self, specification: dict[str, Any]
+    ) -> DecisionProblemResult:
+        self.validate()
+        return evaluate_decision_problem(
+            copy.deepcopy(self.project), self.timeseries.copy(), specification
+        )

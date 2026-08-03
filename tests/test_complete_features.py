@@ -167,11 +167,21 @@ def test_toolkit_and_multiscale_aggregated_outputs(tmp_path: Path) -> None:
     ).empty
     toolkit.write_results(tmp_path)
     for name in (
-        "system_monthly.csv", "system_annual.csv",
+        "system_weekly.csv", "system_monthly.csv", "system_annual.csv",
         "subcatchment_monthly.csv", "component_annual.csv",
         "pollutant_monthly.csv", "recovery_annual.csv",
     ):
         assert (tmp_path / name).exists()
+    assert not toolkit.get_result("system_daily", frequency="weekly").empty
+    assert toolkit.get_result_value(
+        "component_daily", "leakage_ml", component_id="DM1"
+    ) >= 0
+    clipped = toolkit.get_timeseries(
+        ["rainfall_mm"], start=timeseries.iloc[1]["date"], end=timeseries.iloc[2]["date"]
+    )
+    assert len(clipped) == 2
+    toolkit.set_timeseries_column("test_signal", 1.0)
+    assert toolkit.get_timeseries(["test_signal"])["test_signal"].eq(1.0).all()
     assert len(result.subcatchment_daily) == len(timeseries)
 
 

@@ -9,3 +9,9 @@ references/*.pdf
 validation_artifacts/*
 !validation_artifacts/VALIDATION_REPORT_CN.md
 !validation_artifacts/validation_report.json
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js

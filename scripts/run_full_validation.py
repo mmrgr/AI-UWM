@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 
 from watermet2_repro.analysis import (
+    analytic_hierarchy_rank,
     compromise_programming_rank,
+    evaluate_decision_problem,
     grid_calibrate,
     monte_carlo,
     pareto_grid_optimize,
@@ -646,8 +648,72 @@ def run_validation() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         "Python Toolkit读写运行检索",
         toolkit.get_input("components.DM1.kind") == "distribution_main"
         and not toolkit.get_result("component_daily", component_id="DM1").empty
+        and not toolkit.get_result("system_daily", frequency="weekly").empty
         and "subcatchment_daily" in toolkit.list_result_tables(),
-        f"结果表={len(toolkit.list_result_tables())}, 组件={len(toolkit.list_components())}",
+        f"结果表={len(toolkit.list_result_tables())}, 组件={len(toolkit.list_components())}, 周聚合可用",
+    ))
+
+    ahp_criteria = {
+        name: {"goal": spec["goal"]} for name, spec in criteria.items()
+    }
+    ahp_ranked, ahp_diagnostics = analytic_hierarchy_rank(
+        scenario_frame,
+        ahp_criteria,
+        [
+            [1, 2, 3, 2],
+            [0.5, 1, 2, 1],
+            [1 / 3, 0.5, 1, 0.5],
+            [0.5, 1, 2, 1],
+        ],
+    )
+    ahp_ranked.to_csv(OUTPUT / "ahp_ranking.csv", index=False)
+    checks.append(check_record(
+        "AHP权重、一致性与排序",
+        ahp_diagnostics.is_consistent
+        and sorted(ahp_ranked["rank"].tolist()) == [1, 2, 3],
+        f"CR={ahp_diagnostics.consistency_ratio:.4f}, 排序={' > '.join(ahp_ranked.alternative.tolist())}",
+    ))
+
+    dss = evaluate_decision_problem(
+        toolkit_project,
+        toolkit_timeseries,
+        {
+            "scenarios": [{"name": "reference"}],
+            "strategies": [
+                {"name": "BAU"},
+                {
+                    "name": "Leakage reduction",
+                    "set": [{"path": "components.DM1.leakage_fraction", "value": 0.1}],
+                },
+            ],
+            "metrics": {
+                "reliability_fraction": {"goal": "max"},
+                "present_total_cost_eur": {"goal": "min"},
+            },
+            "custom_indicators": [
+                {"scenario": "*", "strategy": "BAU", "metric": "social_acceptance", "value": 5},
+                {"scenario": "*", "strategy": "Leakage reduction", "metric": "social_acceptance", "value": 4},
+            ],
+            "preference_groups": {
+                "cp": {
+                    "method": "cp",
+                    "weights": {
+                        "reliability_fraction": 0.5,
+                        "present_total_cost_eur": 0.5,
+                    },
+                },
+                "ahp": {"method": "ahp", "pairwise": [[1, 2], [0.5, 1]]},
+            },
+        },
+    )
+    dss.rankings.to_csv(OUTPUT / "dss_rankings.csv", index=False)
+    checks.append(check_record(
+        "场景-策略-偏好组DSS及定性指标",
+        len(dss.runs) == 2
+        and len(dss.rankings) == 4
+        and set(dss.rankings["method"]) == {"cp", "ahp"}
+        and "social_acceptance" in dss.runs,
+        f"运行={len(dss.runs)}, 排名={len(dss.rankings)}, 方法={sorted(set(dss.rankings['method']))}",
     ))
     optimization_project = copy.deepcopy(project)
     optimization_timeseries = loaded_timeseries.iloc[:30].copy()

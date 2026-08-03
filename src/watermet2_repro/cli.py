@@ -7,7 +7,9 @@ from pathlib import Path
 import pandas as pd
 
 from .analysis import (
+    analytic_hierarchy_rank,
     compromise_programming_rank,
+    evaluate_decision_problem,
     grid_calibrate,
     monte_carlo,
     pareto_grid_optimize,
@@ -94,6 +96,52 @@ def command_rank(args: argparse.Namespace) -> None:
     print(ranked.to_string(index=False))
 
 
+def command_ahp_rank(args: argparse.Namespace) -> None:
+    alternatives = pd.read_csv(args.alternatives)
+    criteria = json.loads(Path(args.criteria).read_text(encoding="utf-8"))
+    specification = json.loads(Path(args.pairwise).read_text(encoding="utf-8"))
+    ranked, diagnostics = analytic_hierarchy_rank(
+        alternatives,
+        criteria,
+        specification["matrix"],
+        alternative_pairwise=specification.get("alternative_pairwise"),
+        consistency_threshold=float(specification.get("consistency_threshold", 0.10)),
+    )
+    if specification.get("require_consistency", True) and not diagnostics.is_consistent:
+        raise ValueError(
+            f"AHP pairwise matrix is inconsistent (CR={diagnostics.consistency_ratio:.4f})"
+        )
+    if specification.get("require_consistency", True):
+        inconsistent = [
+            column.removeprefix("ahp_consistency_ratio_")
+            for column in ranked
+            if column.startswith("ahp_consistency_ratio_")
+            and float(ranked[column].iloc[0])
+            > float(specification.get("consistency_threshold", 0.10))
+        ]
+        if inconsistent:
+            raise ValueError(
+                f"AHP alternative pairwise matrices are inconsistent: {inconsistent}"
+            )
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    ranked.to_csv(output, index=False)
+    print(f"criteria consistency ratio: {diagnostics.consistency_ratio:.6f}")
+    print(ranked.to_string(index=False))
+
+
+def command_dss(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    specification = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    result = evaluate_decision_problem(project, timeseries, specification)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    result.runs.to_csv(output / "scenario_strategy_runs.csv", index=False)
+    result.decision_matrix.to_csv(output / "decision_matrix.csv", index=False)
+    result.rankings.to_csv(output / "rankings.csv", index=False)
+    print(result.rankings.to_string(index=False))
+
+
 def command_optimize(args: argparse.Namespace) -> None:
     project, timeseries = load_project(args.project, args.timeseries)
     specification = json.loads(Path(args.spec).read_text(encoding="utf-8"))
@@ -142,6 +190,22 @@ def build_parser() -> argparse.ArgumentParser:
     rank.add_argument("--p", type=float, default=2.0)
     rank.add_argument("--output", default="output/ranking.csv")
     rank.set_defaults(func=command_rank)
+
+    ahp_rank = subparsers.add_parser("ahp-rank", help="AHP 多准则排序")
+    ahp_rank.add_argument("--alternatives", required=True)
+    ahp_rank.add_argument("--criteria", required=True)
+    ahp_rank.add_argument("--pairwise", required=True)
+    ahp_rank.add_argument("--output", default="output/ahp_ranking.csv")
+    ahp_rank.set_defaults(func=command_ahp_rank)
+
+    dss = subparsers.add_parser(
+        "dss", help="批量评估场景与干预策略并按 CP/AHP 排序"
+    )
+    dss.add_argument("project")
+    dss.add_argument("--timeseries")
+    dss.add_argument("--spec", required=True)
+    dss.add_argument("--output", default="output/dss")
+    dss.set_defaults(func=command_dss)
 
     optimize = subparsers.add_parser("optimize", help="离散干预方案的多目标 Pareto 优化")
     optimize.add_argument("project")

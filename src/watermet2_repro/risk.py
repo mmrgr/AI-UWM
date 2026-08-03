@@ -36,6 +36,32 @@ RISK_CATALOG = {
     "R09HZ02": ("high_velocity_flood_area_m2", "m2/day", "High-velocity street runoff"),
 }
 
+RISK_METHODS = {
+    "R01HZ01": "derived_physical_indicator",
+    "R01HZ02": "direct_model_output",
+    "R01HZ03": "derived_physical_indicator",
+    "R01HZ04": "direct_model_output",
+    "R01HZ05": "derived_physical_indicator",
+    "R02HZ01": "derived_physical_indicator",
+    "R03HZ01": "direct_model_output",
+    "R03HZ02": "direct_model_output",
+    "R05HZ01": "deterministic_proxy",
+    "R07HZ01": "derived_physical_indicator",
+    "R07HZ02": "deterministic_proxy",
+    "R08HZ03": "direct_model_output",
+    "R08HZ04": "derived_physical_indicator",
+    "R08HZ05": "derived_physical_indicator",
+    "R08HZ06": "derived_physical_indicator",
+    "R08HZ07": "derived_physical_indicator",
+    "R08HZ08": "derived_physical_indicator",
+    "R08HZ09": "derived_physical_indicator",
+    "R08HZ11": "deterministic_proxy",
+    "R08HZ12": "derived_physical_indicator",
+    "R08HZ13": "deterministic_proxy",
+    "R09HZ01": "deterministic_proxy",
+    "R09HZ02": "deterministic_proxy",
+}
+
 
 @dataclass
 class RiskResult:
@@ -141,6 +167,15 @@ def evaluate_risks(
     storage = component[
         component["kind"].isin(["water_resource", "service_reservoir"])
     ].groupby("date")["storage_ml"].sum()
+    reservoir_capacity = sum(
+        float(c.get("capacity_ml", 0.0))
+        for c in project["components"].values()
+        if c["kind"] == "service_reservoir"
+        and np.isfinite(float(c.get("capacity_ml", 0.0)))
+    )
+    reservoir_storage = component[
+        component["kind"].eq("service_reservoir")
+    ].groupby("date")["storage_ml"].sum()
     cso = component.groupby("date")["cso_ml"].sum()
     untreated = component.groupby("date")["untreated_ml"].sum()
     component_costs = component.groupby("date").sum(numeric_only=True)
@@ -170,7 +205,9 @@ def evaluate_risks(
     indicators["R07HZ01"] = dates.map(
         flood_by_date.get("flooded_area_m2", pd.Series(dtype=float))
     ).fillna(0.0)
-    indicators["R07HZ02"] = indicators["R07HZ01"]
+    indicators["R07HZ02"] = indicators["R07HZ01"] * float(
+        project.get("risk_settings", {}).get("property_flood_fraction", 0.0)
+    )
     industrial = pd.Series(0.0, index=system.index)
     for name in industrial_names:
         column = f"unmet_{name}_ml"
@@ -188,9 +225,16 @@ def evaluate_risks(
         / _series(system, "population").replace(0, np.nan)
     ).fillna(0.0)
     indicators["R08HZ06"] = _series(system, "expected_failures")
-    storage_fraction = dates.map(storage).fillna(0.0) / max(storage_capacity, 1e-12)
-    indicators["R08HZ07"] = (1.0 - storage_fraction).clip(lower=0.0)
-    indicators["R08HZ08"] = indicators["R08HZ07"]
+    if storage_capacity > 0:
+        storage_fraction = dates.map(storage).fillna(0.0) / storage_capacity
+        indicators["R08HZ07"] = (1.0 - storage_fraction).clip(lower=0.0)
+    else:
+        indicators["R08HZ07"] = pd.Series(0.0, index=system.index)
+    if reservoir_capacity > 0:
+        reservoir_fraction = dates.map(reservoir_storage).fillna(0.0) / reservoir_capacity
+        indicators["R08HZ08"] = (1.0 - reservoir_fraction).clip(lower=0.0)
+    else:
+        indicators["R08HZ08"] = pd.Series(0.0, index=system.index)
     recharge = _series(system, "aquifer_recharge_ml")
     indicators["R08HZ09"] = (baseline_recharge - recharge).clip(lower=0.0)
     indicators["R08HZ11"] = _series(system, "unmet_demand_ml")
@@ -206,12 +250,25 @@ def evaluate_risks(
     records: list[dict[str, Any]] = []
     for code, (indicator_name, unit, description) in RISK_CATALOG.items():
         spec = thresholds.get(code, {})
-        threshold = float(spec.get("threshold", 0.0))
+        assessed = "threshold" in spec
+        threshold = float(spec["threshold"]) if assessed else np.nan
+        tolerance = max(0.0, float(spec.get("tolerance", 1e-9)))
         consequence = float(spec.get("consequence_weight", 1.0))
         values = pd.Series(indicators[code], index=system.index).astype(float)
-        exceedance = (values > threshold).astype(float)
-        scale = max(abs(threshold), float(spec.get("normalization_scale", 1.0)), 1e-12)
-        severity = ((values - threshold).clip(lower=0.0) / scale).clip(upper=float(spec.get("severity_cap", 1e6)))
+        if assessed:
+            exceedance = (values > threshold + tolerance).astype(float)
+            scale = max(
+                abs(threshold),
+                float(spec.get("normalization_scale", 1.0)),
+                tolerance,
+                1e-12,
+            )
+            severity = (
+                (values - threshold - tolerance).clip(lower=0.0) / scale
+            ).clip(upper=float(spec.get("severity_cap", 1e6)))
+        else:
+            exceedance = pd.Series(0.0, index=values.index)
+            severity = pd.Series(0.0, index=values.index)
         for index, value in values.items():
             records.append(
                 {
@@ -222,11 +279,13 @@ def evaluate_risks(
                     "unit": unit,
                     "value": value,
                     "threshold": threshold,
+                    "tolerance": tolerance,
+                    "assessed": assessed,
                     "exceeded": bool(exceedance.iloc[index]),
                     "severity": float(severity.iloc[index]),
                     "consequence_weight": consequence,
                     "risk_score": float(exceedance.iloc[index] * severity.iloc[index] * consequence),
-                    "method": "deterministic_proxy",
+                    "method": RISK_METHODS[code],
                 }
             )
     daily = pd.DataFrame(records)
@@ -235,10 +294,14 @@ def evaluate_risks(
         .agg(
             mean_value=("value", "mean"),
             maximum_value=("value", "max"),
+            assessed_days=("assessed", "sum"),
             exceedance_days=("exceeded", "sum"),
             probability=("exceeded", "mean"),
             cumulative_risk_score=("risk_score", "sum"),
             maximum_severity=("severity", "max"),
         )
+    )
+    summary["assessment_status"] = np.where(
+        summary["assessed_days"] > 0, "configured", "unconfigured"
     )
     return RiskResult(assets, floods, daily, summary)

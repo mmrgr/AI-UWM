@@ -1,0 +1,61 @@
+{
+  "scenarios": [
+    {"name": "reference"},
+    {
+      "name": "high_population_growth",
+      "set": [
+        {"path": "local_areas.LA1.annual_population_growth", "value": 0.03}
+      ]
+    }
+  ],
+  "strategies": [
+    {"name": "BAU"},
+    {
+      "name": "Leakage reduction",
+      "set": [
+        {"path": "components.DM1.leakage_fraction", "value": 0.10},
+        {"path": "components.DM2.leakage_fraction", "value": 0.10}
+      ]
+    },
+    {
+      "name": "Enhanced reuse",
+      "set": [
+        {"path": "components.RWH_LOCAL.collection_fraction", "value": 0.80},
+        {"path": "components.RWH_LOCAL.treatment_capacity_ml_day", "value": 180.0},
+        {"path": "components.GWR_SUB.treatment_capacity_ml_day", "value": 180.0}
+      ]
+    }
+  ],
+  "metrics": {
+    "reliability_fraction": {"goal": "max"},
+    "mean_annual_ghg_net_kg_co2e": {"goal": "min"},
+    "present_total_cost_eur": {"goal": "min"},
+    "social_acceptance": {"goal": "max"}
+  },
+  "custom_indicators": [
+    {"scenario": "*", "strategy": "BAU", "metric": "social_acceptance", "value": 5.0},
+    {"scenario": "*", "strategy": "Leakage reduction", "metric": "social_acceptance", "value": 8.0},
+    {"scenario": "*", "strategy": "Enhanced reuse", "metric": "social_acceptance", "value": 7.0}
+  ],
+  "preference_groups": {
+    "balanced_cp": {
+      "method": "cp",
+      "p": 2,
+      "weights": {
+        "reliability_fraction": 0.35,
+        "mean_annual_ghg_net_kg_co2e": 0.25,
+        "present_total_cost_eur": 0.25,
+        "social_acceptance": 0.15
+      }
+    },
+    "consumer_ahp": {
+      "method": "ahp",
+      "pairwise": [
+        [1.0, 2.0, 2.0, 4.0],
+        [0.5, 1.0, 1.0, 2.0],
+        [0.5, 1.0, 1.0, 2.0],
+        [0.25, 0.5, 0.5, 1.0]
+      ]
+    }
+  }
+}

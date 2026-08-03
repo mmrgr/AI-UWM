@@ -1,8 +1,21 @@
 # WaterMet² 开放复现与城市水系统分析框架
 
-这是依据 Behzadian 与 Kapelan（2015）论文、TRUST D33.2 官方手册和 Oslo 案例报告重写的 Python 实现。它覆盖公开文献描述的 WaterMet² 分析链：日尺度水量与污染物质量守恒、四级空间表达、供水—用水—雨洪—污水—回用、能源/材料/化学品、环境影响、成本、资源回收、干预方案、校准、不确定性和多准则排序。
+这是依据 Behzadian 与 Kapelan（2015）论文、TRUST D33.2 官方手册和 Oslo 案例报告重写的 Python 实现。它覆盖公开文献描述的 WaterMet² 分析链：日尺度水量与污染物质量守恒、四级空间表达、供水—用水—雨洪—污水—回用、能源/材料/化学品、环境影响、成本、资源回收、干预方案、校准、不确定性、CP/AHP 多准则排序和场景决策支持。
 
 原始 WaterMet² 是闭源 C# 软件，论文使用的 Oslo SCADA 日序列也未公开，因此本项目不能声称与原二进制逐行或逐日数值完全相同；但公开方法和功能都已有可审计实现。完整对照见 [FUNCTIONAL_COVERAGE_CN.md](FUNCTIONAL_COVERAGE_CN.md)，论文案例复现边界见 [REPRODUCTION_REPORT_CN.md](REPRODUCTION_REPORT_CN.md)。
+
+## Windows 一键打开
+
+日常使用只需双击项目根目录中的：
+
+```text
+启动WaterMet2 Studio.cmd
+```
+
+程序会自动检查依赖、构建网页、启动模型服务并打开
+<http://127.0.0.1:8000>。现在前端和 API 由同一个 Python 进程提供，不再需要手动启动两个终端。
+
+第一次启动可能需要几分钟安装依赖；以后通常会直接打开。关闭启动程序窗口即可停止系统。目录用途见 [项目文件说明.md](项目文件说明.md)，自有数据操作教程见 [frontend/README.md](frontend/README.md)。
 
 主要公开依据：
 
@@ -20,7 +33,26 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-当前验证结果为 `24 passed`。安装后可使用 `watermet2` 命令；若环境没有刷新命令入口，可用 `python -m watermet2_repro.cli` 替代。
+当前验证结果为 `26 passed`。安装后可使用 `watermet2` 命令；若环境没有刷新命令入口，可用 `python -m watermet2_repro.cli` 替代。
+
+### 可视化前端
+
+项目包含 React + TypeScript 的 WaterMet² Studio，可编辑系统拓扑、导入 CSV、执行前后端校验、运行同一套 Python 模型，并查看 KPI、桑基图、时间序列、风险和情景对比。
+
+```powershell
+python -m pip install -e ".[studio,test]"
+watermet2-api
+```
+
+另开一个 PowerShell：
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+访问 <http://127.0.0.1:5173>。分析自有数据的完整中文步骤见 [frontend/README.md](frontend/README.md)。
 
 ### 一键生成模拟数据并验证整个流程
 
@@ -29,7 +61,7 @@ $env:PYTHONPATH='src'
 python scripts\run_full_validation.py
 ```
 
-该脚本不读取预制观测值，而是用固定随机种子从代码生成 731 天天气和水源序列，再执行完整模拟、质量守恒审计、资产失效、全寿命成本、地下水补给、洪涝、23 类风险、已知真值校准、情景分析、Monte Carlo、多准则排序和 Pareto 优化。当前为 `27/27` 项通过。结果写入 `validation_artifacts/`，中文结论见 `validation_artifacts/VALIDATION_REPORT_CN.md`，机器可读判据见 `validation_artifacts/validation_report.json`。
+该脚本不读取预制观测值，而是用固定随机种子从代码生成 731 天天气和水源序列，再执行完整模拟、质量守恒审计、资产失效、全寿命成本、地下水补给、洪涝、23 类风险、已知真值校准、情景分析、Monte Carlo、CP/AHP、完整 DSS 和 Pareto 优化。当前为 `29/29` 项通过。结果写入 `validation_artifacts/`，中文结论见 `validation_artifacts/VALIDATION_REPORT_CN.md`，机器可读判据见 `validation_artifacts/validation_report.json`。
 
 ## 2. 先运行完整示例
 
@@ -223,7 +255,7 @@ watermet2 run path\to\project.json --output output\my_case
 | `material_events.csv` | 管网修复长度、材料、柴油和资本成本 |
 | `asset_daily/monthly/annual.csv` | 资产期望失效、停运小时、维修、维护与年化资本成本 |
 | `flood_daily/monthly/annual.csv` | 溢流体积、假定水深、淹没面积、街道流速与高流速面积 |
-| `risk_daily/monthly/annual.csv` | 官方 23 个风险代码的逐日指标、阈值、超限和风险分数 |
+| `risk_daily/weekly/monthly/annual.csv` | 官方 23 个风险代码的多尺度指标、阈值、评估状态、超限和风险分数 |
 | `risk_summary.csv` | 各风险的超限天数、概率、最大严重度和累计风险分数 |
 | `summary.json` | 可靠性、总缺水、净 GHG 和现值成本摘要 |
 
@@ -300,6 +332,22 @@ watermet2 rank `
 
 这是 Oslo 报告使用的 Compromise Programming。`goal` 可设为 `min` 或 `max`，权重应由利益相关方讨论确定，不应由模型替代价值判断。
 
+AHP 与完整 DSS：
+
+```powershell
+watermet2 ahp-rank `
+  --alternatives examples\demo_full\alternatives.csv `
+  --criteria examples\demo_full\criteria.json `
+  --pairwise examples\demo_full\ahp_pairwise.json `
+  --output output\ahp_ranking.csv
+
+watermet2 dss examples\demo_full\project.json `
+  --spec examples\demo_full\dss.json `
+  --output output\dss
+```
+
+`dss.json` 可定义多个场景、干预策略、定量指标、外部定性指标和利益相关方偏好组，并同时使用 CP 与 AHP。AHP 输出判断矩阵一致性比率 CR；默认拒绝超过一致性阈值的矩阵。Studio 的“高级分析”页也可直接执行同一工作流。
+
 ### 4.5 多目标 Pareto 优化
 
 ```powershell
@@ -319,10 +367,12 @@ toolkit = WaterMet2Toolkit.open("examples/demo_full/project.json")
 toolkit.set_input("components.DM1.leakage_fraction", 0.15)
 toolkit.run()
 dm1 = toolkit.get_result("component_daily", component_id="DM1")
+weekly = toolkit.get_result("system_daily", frequency="weekly")
+total_leakage = toolkit.get_result_value("component_daily", "leakage_ml", component_id="DM1")
 toolkit.write_results("output/toolkit_case")
 ```
 
-该接口提供打开/保存工程、读取/修改任意输入、校验、运行、列举组件和筛选结果，用于替代当前无法获得的原 `WaterMet2.dll/Toolkit.dll`。
+该接口提供打开/保存工程、读取/修改任意输入和时序列、校验、运行、列举组件、日期筛选、日/周/月/年聚合和标量提取。它提供原 Toolkit 的高层用途，但不声称兼容原 `WaterMet2.dll/Toolkit.dll` ABI 或函数签名。
 
 ## 5. 常见问题
 

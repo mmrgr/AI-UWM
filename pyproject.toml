@@ -11,9 +11,15 @@ dependencies = ["numpy>=2.0", "pandas>=2.2", "matplotlib>=3.9"]
 
 [project.scripts]
 watermet2 = "watermet2_repro.cli:main"
+watermet2-api = "watermet2_repro.api:main"
+watermet2-studio = "watermet2_repro.studio:main"
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "httpx>=0.28"]
+studio = [
+    "fastapi>=0.116",
+    "uvicorn[standard]>=0.35",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
