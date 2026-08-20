@@ -4,6 +4,7 @@ export type ResultRow = Record<string, Scalar>;
 
 export interface SimulationResponse {
   summary: Record<string, number>;
+  ai_water_summary?: Record<string, number>;
   tables: Record<ResultTableName, ResultRow[]>;
 }
 
@@ -39,6 +40,7 @@ export type ResultTableName =
   | 'asset_daily'
   | 'flood_daily'
   | 'risk_daily'
-  | 'risk_summary';
+  | 'risk_summary'
+  | 'data_center_daily';
 
 export type ResultFrequency = 'daily' | 'weekly' | 'monthly' | 'annual';

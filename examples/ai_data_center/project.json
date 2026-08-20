@@ -1,0 +1,73 @@
+{
+  "name": "AI data center urban water carrying-capacity example",
+  "timeseries_file": "timeseries.csv",
+  "ai_database_file": "../../data/ai_data_center_database.json",
+  "simulation": {"start": "2030-07-01", "end": "2030-07-10"},
+  "finance": {"base_date": "2030-07-01", "discount_rate": 0.03},
+  "energy_sources": {
+    "electricity": {"ghg_kg_co2e_unit": 0.35, "acid_kg_so2e_unit": 0.0002, "eutro_kg_po4e_unit": 0.00003, "cost_eur_unit": 0.11}
+  },
+  "components": {
+    "RES1": {"kind": "water_resource", "capacity_ml": 10000, "initial_ml": 5000, "inflow_column": "reservoir_inflow_ml", "abstraction_capacity_ml_day": 80},
+    "WTW1": {"kind": "wtw", "daily_capacity_ml": 75, "loss_fraction": 0.01, "electricity_kwh_m3": 0.34},
+    "DM1": {"kind": "distribution_main", "daily_capacity_ml": 72, "leakage_fraction": 0.08, "electricity_kwh_m3": 0.18},
+    "CENTRAL_REUSE": {"kind": "reuse", "reuse_type": "central", "capacity_ml": 20, "initial_ml": 2, "treatment_capacity_ml_day": 8, "target_areas": ["LA1"], "eligible_demands": ["irrigation"], "priority": 5},
+    "SEWER1": {"kind": "sewer", "sewer_type": "sanitary", "capacity_mode": "transmission", "capacity_ml": 100, "daily_capacity_ml": 100, "overflow_to": "RIVER1"},
+    "WWTW1": {"kind": "wwtw", "capacity_ml": 50, "initial_ml": 0, "daily_capacity_ml": 90, "overflow_to": "RIVER1", "pollutant_removal_fraction": {"BOD": 0.9, "TSS": 0.92, "TDS": 0.05}, "central_reuse_component": "CENTRAL_REUSE", "central_reuse_fraction": 0.3},
+    "RIVER1": {"kind": "receiving_water"},
+    "AI_DC1": {
+      "kind": "data_center",
+      "local_area": "LA1",
+      "installed_it_capacity_mw": 500,
+      "capacity_schedule": [{"date": "2030-07-01", "capacity_mw": 300}, {"date": "2030-07-06", "capacity_mw": 500}],
+      "load_factor": 0.75,
+      "pue_mode": "dynamic",
+      "base_pue": 1.2,
+      "temperature_coefficient": 0.003,
+      "min_pue": 1.05,
+      "max_pue": 1.7,
+      "cooling_storage_ml": 2,
+      "initial_cooling_storage_ml": 1,
+      "cooling": {
+        "technology": "hybrid",
+        "model": "tower_balance",
+        "heat_to_cooling_fraction": 1,
+        "hybrid_wet_bulb_start_c": 14,
+        "hybrid_full_wet_bulb_c": 25,
+        "cycles_of_concentration": 5,
+        "coc_mode": "quality_limited",
+        "water_quality_limits": {"TDS": 2200, "chloride": 500},
+        "drift_fraction": 0.0002,
+        "blowdown_return_fraction": 1,
+        "internal_recovery_fraction": 0.1,
+        "blowdown_quality_mg_l": {"TDS": 1800}
+      },
+      "water_sources": {
+        "reclaimed": {"component_id": "CENTRAL_REUSE", "target_fraction": 0.7, "priority": 1, "quality": {"TDS": 650, "chloride": 130}},
+        "potable": {"target_fraction": 0.3, "priority": 2, "quality": {"TDS": 180, "chloride": 35}}
+      },
+      "water_fallback": true,
+      "priority_class": "ai_data_center",
+      "offsite_electricity_water_intensity_l_kwh": 0.4
+    }
+  },
+  "local_areas": {
+    "LA1": {
+      "subcatchment": "SUB1",
+      "base_population": 120000,
+      "area_ha": 2500,
+      "weather_columns": {"precipitation": "rainfall_mm", "temperature": "temperature_c", "relative_humidity": "relative_humidity_pct"},
+      "surfaces": {"impervious": {"fraction": 0.6, "runoff_coefficient": 0.8}, "pervious": {"fraction": 0.4, "runoff_coefficient": 0.15}},
+      "demand_profiles": [
+        {"name": "domestic", "base_value": 150, "unit": "l_capita_day", "return_fraction": 0.95},
+        {"name": "irrigation", "base_value": 3, "unit": "ml_day", "temperature_sensitivity": 0.03, "return_fraction": 0}
+      ],
+      "sanitary_sewer": "SEWER1",
+      "storm_sewer": "SEWER1",
+      "sanitary_pollutant_load_kg_capita_day": {"BOD": 0.06, "TSS": 0.07}
+    }
+  },
+  "subcatchments": {"SUB1": {"local_areas": ["LA1"]}},
+  "supply_paths": [{"id": "PATH1", "local_area": "LA1", "chain": ["RES1", "WTW1", "DM1"], "allocation": 1, "priority": 1, "demand_priority": ["domestic", "data_center::AI_DC1", "irrigation"]}],
+  "wastewater_connections": [{"from": "SEWER1", "to": "WWTW1", "fraction": 1}, {"from": "WWTW1", "to": "RIVER1", "fraction": 1}]
+}

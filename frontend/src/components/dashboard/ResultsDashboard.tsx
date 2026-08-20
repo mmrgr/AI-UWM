@@ -62,6 +62,10 @@ export function ResultsDashboard() {
     () => aggregateRows(result?.tables.system_daily ?? [], frequency),
     [frequency, result],
   );
+  const aiRows = useMemo(
+    () => aggregateRows(result?.tables.data_center_daily ?? [], frequency),
+    [frequency, result],
+  );
 
   if (!result) {
     return (
@@ -139,6 +143,22 @@ export function ResultsDashboard() {
     { label: '现值总成本', value: formatMetric(cost, 'EUR'), icon: CurrencyDollarEuroRegular, tone: 'purple' },
     { label: '风险代码', value: `${result.tables.risk_summary.length} 类`, icon: ArrowTrendingRegular, tone: 'cyan' },
   ];
+  const aiSummary = result.ai_water_summary ?? {};
+  const aiOption = {
+    animation: false,
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['AI取水', '再生水', '消耗', '回流水'] },
+    grid: { left: 55, right: 30, top: 48, bottom: 48 },
+    xAxis: { type: 'category', data: aiRows.map((row) => row.date), axisLabel: { hideOverlap: true } },
+    yAxis: { type: 'value', name: 'ML' },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 8 }],
+    series: [
+      { name: 'AI取水', type: 'line', showSymbol: false, data: aiRows.map((row) => number(row, 'external_withdrawal_ml')) },
+      { name: '再生水', type: 'line', showSymbol: false, data: aiRows.map((row) => number(row, 'reclaimed_water_ml')) },
+      { name: '消耗', type: 'line', showSymbol: false, data: aiRows.map((row) => number(row, 'consumption_ml')) },
+      { name: '回流水', type: 'line', showSymbol: false, data: aiRows.map((row) => number(row, 'return_flow_ml')) },
+    ],
+  };
   const tableRows = result.tables[selectedTable];
   const tableColumns = Object.keys(tableRows[0] ?? {});
   const downloadTable = () => {
@@ -209,6 +229,21 @@ export function ResultsDashboard() {
           );
         })}
       </div>
+      {aiRows.length > 0 && (
+        <>
+          <div className="section-heading"><div><span className="eyebrow">AI WATER</span><h2>AI算力—城市水承载力</h2><p>直接取水、循环结构、峰值压力与冷却缺水。</p></div></div>
+          <div className="kpi-grid">
+            <div className="kpi-card tone-blue"><DropRegular /><span>AI总取水</span><strong>{formatMetric(number(aiSummary, 'total_withdrawal_ml'), 'ML')}</strong></div>
+            <div className="kpi-card tone-cyan"><DropRegular /><span>再生水替代率</span><strong>{number(aiSummary, 'reclaimed_water_substitution_ratio').toLocaleString('zh-CN', { style: 'percent', maximumFractionDigits: 1 })}</strong></div>
+            <div className="kpi-card tone-amber"><ArrowTrendingRegular /><span>峰值容量比</span><strong>{number(aiSummary, 'peak_capacity_ratio').toFixed(3)}</strong></div>
+            <div className="kpi-card tone-red"><DropRegular /><span>冷却缺水</span><strong>{formatMetric(number(aiSummary, 'unmet_cooling_water_ml'), 'ML')}</strong></div>
+          </div>
+          <section className="card time-card">
+            <div className="section-heading"><div><h2>AI Water 日序列</h2><p>Withdrawal / Consumption / Return Flow 分离核算。</p></div></div>
+            <EChart option={aiOption} style={{ height: 360 }} />
+          </section>
+        </>
+      )}
       <div className="dashboard-grid">
         <section className="card sankey-card">
           <div className="section-heading"><div><h2>城市水代谢桑基图</h2><p>线宽表示模拟期累计通量；回用闭环在系统模型中单独展示。</p></div></div>

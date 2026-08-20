@@ -9,6 +9,16 @@ references/*.pdf
 validation_artifacts/*
 !validation_artifacts/VALIDATION_REPORT_CN.md
 !validation_artifacts/validation_report.json
+!validation_artifacts/ai_validation_report.json
+!validation_artifacts/AI_VALIDATION_REPORT_CN.md
+!validation_artifacts/ai_baseline_delta.csv
+!validation_artifacts/ai_capacity_scan.csv
+!validation_artifacts/ai_capacity_threshold.csv
+!validation_artifacts/ai_pareto_strategies.csv
+!validation_artifacts/ai_morris.csv
+!validation_artifacts/ai_sobol.csv
+!validation_artifacts/ai_probabilistic_threshold.csv
+!validation_artifacts/ai_infrastructure_utilization.csv
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/

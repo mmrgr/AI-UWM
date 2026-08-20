@@ -1,0 +1,73 @@
+{
+  "metadata": {
+    "title": "AI data-center research parameter database",
+    "version": "1.0.0",
+    "note": "Literature-informed priors for scenario and uncertainty analysis; replace with site-specific engineering data before application. WUE is a validation prior and is not used to drive the tower water balance."
+  },
+  "cooling_technologies": {
+    "evaporative": {
+      "typical_pue": {"value": 1.20, "unit": "-", "source": "LBNL 2024 U.S. Data Center Energy Usage Report", "year": 2024, "type": "literature", "uncertainty": {"distribution": "triangular", "low": 1.10, "mode": 1.20, "high": 1.40}},
+      "typical_wue_l_kwh": {"value": 1.20, "unit": "L/kWh IT", "source": "scenario prior; calibrate locally", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "triangular", "low": 0.5, "mode": 1.2, "high": 2.0}},
+      "typical_coc": {"value": 5.0, "unit": "-", "source": "DOE FEMP cooling-water guidance", "year": 2018, "type": "literature", "uncertainty": {"distribution": "uniform", "low": 3.0, "high": 7.0}},
+      "drift_fraction": {"value": 0.0002, "unit": "fraction of makeup", "source": "engineering scenario prior", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "uniform", "low": 0.00005, "high": 0.0005}},
+      "heat_to_cooling_fraction": {"value": 1.0, "unit": "fraction", "source": "energy balance", "year": 2025, "type": "model", "uncertainty": {"distribution": "uniform", "low": 0.95, "high": 1.0}},
+      "technology_pue_adjustment": {"value": 0.0, "unit": "PUE", "source": "reference technology", "year": 2025, "type": "assumption"}
+    },
+    "efficient_evaporative": {
+      "typical_pue": {"value": 1.17, "unit": "-", "source": "high-efficiency scenario prior", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "triangular", "low": 1.08, "mode": 1.17, "high": 1.30}},
+      "typical_wue_l_kwh": {"value": 0.85, "unit": "L/kWh IT", "source": "scenario prior; calibrate locally", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "triangular", "low": 0.3, "mode": 0.85, "high": 1.5}},
+      "typical_coc": {"value": 7.0, "unit": "-", "source": "DOE FEMP cooling-water guidance", "year": 2018, "type": "literature", "uncertainty": {"distribution": "uniform", "low": 5.0, "high": 9.0}},
+      "drift_fraction": {"value": 0.00005, "unit": "fraction of makeup", "source": "high-efficiency scenario prior", "year": 2025, "type": "assumption"},
+      "heat_to_cooling_fraction": {"value": 1.0, "unit": "fraction", "source": "energy balance", "year": 2025, "type": "model"},
+      "technology_pue_adjustment": {"value": -0.02, "unit": "PUE", "source": "technology scenario prior", "year": 2025, "type": "assumption"}
+    },
+    "hybrid": {
+      "typical_pue": {"value": 1.24, "unit": "-", "source": "hybrid scenario prior", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "triangular", "low": 1.12, "mode": 1.24, "high": 1.45}},
+      "typical_wue_l_kwh": {"value": 0.60, "unit": "L/kWh IT", "source": "weather-dependent scenario prior", "year": 2025, "type": "assumption"},
+      "typical_coc": {"value": 5.0, "unit": "-", "source": "DOE FEMP cooling-water guidance", "year": 2018, "type": "literature"},
+      "drift_fraction": {"value": 0.0002, "unit": "fraction of makeup", "source": "engineering scenario prior", "year": 2025, "type": "assumption"},
+      "heat_to_cooling_fraction": {"value": 1.0, "unit": "fraction", "source": "energy balance", "year": 2025, "type": "model"},
+      "technology_pue_adjustment": {"value": 0.04, "unit": "PUE", "source": "technology scenario prior", "year": 2025, "type": "assumption"}
+    },
+    "dry": {
+      "typical_pue": {"value": 1.32, "unit": "-", "source": "dry-cooling energy penalty scenario prior", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "triangular", "low": 1.18, "mode": 1.32, "high": 1.55}},
+      "typical_wue_l_kwh": {"value": 0.0, "unit": "L/kWh IT onsite", "source": "no routine evaporative heat rejection", "year": 2025, "type": "model"},
+      "typical_coc": {"value": 5.0, "unit": "-", "source": "not active in dry mode", "year": 2025, "type": "model"},
+      "drift_fraction": {"value": 0.0, "unit": "fraction", "source": "not active in dry mode", "year": 2025, "type": "model"},
+      "heat_to_cooling_fraction": {"value": 1.0, "unit": "fraction", "source": "energy balance", "year": 2025, "type": "model"},
+      "technology_pue_adjustment": {"value": 0.12, "unit": "PUE", "source": "technology scenario prior", "year": 2025, "type": "assumption"}
+    },
+    "liquid_to_air": {
+      "typical_pue": {"value": 1.25, "unit": "-", "source": "liquid-to-air scenario prior", "year": 2025, "type": "assumption"},
+      "typical_wue_l_kwh": {"value": 0.0, "unit": "L/kWh IT onsite", "source": "dry final heat rejection", "year": 2025, "type": "model"},
+      "typical_coc": {"value": 5.0, "unit": "-", "source": "not active in dry mode", "year": 2025, "type": "model"},
+      "drift_fraction": {"value": 0.0, "unit": "fraction", "source": "not active in dry mode", "year": 2025, "type": "model"},
+      "heat_to_cooling_fraction": {"value": 1.0, "unit": "fraction", "source": "energy balance", "year": 2025, "type": "model"},
+      "technology_pue_adjustment": {"value": 0.05, "unit": "PUE", "source": "technology scenario prior", "year": 2025, "type": "assumption"}
+    },
+    "liquid_to_water": {
+      "typical_pue": {"value": 1.18, "unit": "-", "source": "liquid-to-water scenario prior", "year": 2025, "type": "assumption"},
+      "typical_wue_l_kwh": {"value": 1.0, "unit": "L/kWh IT", "source": "water-side final heat rejection scenario prior", "year": 2025, "type": "assumption"},
+      "typical_coc": {"value": 5.0, "unit": "-", "source": "DOE FEMP cooling-water guidance", "year": 2018, "type": "literature"},
+      "drift_fraction": {"value": 0.0002, "unit": "fraction of makeup", "source": "engineering scenario prior", "year": 2025, "type": "assumption"},
+      "heat_to_cooling_fraction": {"value": 1.0, "unit": "fraction", "source": "energy balance", "year": 2025, "type": "model"},
+      "technology_pue_adjustment": {"value": -0.02, "unit": "PUE", "source": "technology scenario prior", "year": 2025, "type": "assumption"}
+    }
+  },
+  "water_quality_thresholds": {
+    "TDS": {"value": 2200, "unit": "mg/L", "source": "site-specific design placeholder informed by ASHRAE water-treatment guidance", "year": 2025, "type": "assumption", "uncertainty": {"distribution": "uniform", "low": 1500, "high": 3000}},
+    "conductivity": {"value": 3200, "unit": "uS/cm", "source": "site-specific design placeholder", "year": 2025, "type": "assumption"},
+    "hardness": {"value": 700, "unit": "mg/L as CaCO3", "source": "site-specific design placeholder", "year": 2025, "type": "assumption"},
+    "alkalinity": {"value": 500, "unit": "mg/L as CaCO3", "source": "site-specific design placeholder", "year": 2025, "type": "assumption"},
+    "chloride": {"value": 500, "unit": "mg/L", "source": "site-specific design placeholder", "year": 2025, "type": "assumption"},
+    "silica": {"value": 150, "unit": "mg/L", "source": "site-specific design placeholder", "year": 2025, "type": "assumption"}
+  },
+  "indirect_grid_water_intensity_l_kwh": {
+    "value": 0.4,
+    "unit": "L/kWh facility electricity",
+    "source": "LBNL 2024 report; regional value required",
+    "year": 2024,
+    "type": "literature_prior",
+    "uncertainty": {"distribution": "uniform", "low": 0.05, "high": 1.5}
+  }
+}

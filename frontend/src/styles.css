@@ -402,6 +402,7 @@ button {
 .kind-reuse .node-icon { background: #2f9e44; }
 .kind-receiving_water .node-icon { background: #00a8a8; }
 .kind-local_area .node-icon { background: #7a4fa3; }
+.kind-data_center .node-icon { background: #d83b01; }
 
 .node-content {
   display: flex;

@@ -39,6 +39,7 @@ const layoutColumns: Record<ComponentKind, number> = {
   service_reservoir: 4,
   distribution_main: 5,
   local_area: 6,
+  data_center: 7,
   reuse: 5,
   sewer: 7,
   wwtw: 8,
@@ -60,6 +61,19 @@ function defaultConfig(kind: ComponentKind): Record<string, unknown> {
         impervious: { fraction: 0.6, runoff_coefficient: 0.8 },
         pervious: { fraction: 0.4, runoff_coefficient: 0.15 },
       },
+    };
+  }
+  if (kind === 'data_center') {
+    return {
+      ...base,
+      local_area: 'LA1',
+      installed_it_capacity_mw: 500,
+      load_factor: 0.75,
+      pue_mode: 'dynamic',
+      base_pue: 1.2,
+      cooling: { technology: 'evaporative', cycles_of_concentration: 5, drift_fraction: 0.0002, blowdown_return_fraction: 1 },
+      water_sources: { reclaimed: { target_fraction: 0.7, priority: 1 }, potable: { target_fraction: 0.3, priority: 2 } },
+      water_fallback: true,
     };
   }
   if (kind === 'receiving_water') return base;
@@ -173,6 +187,7 @@ export function ModelCanvas() {
         sewer: 'SEWER',
         wwtw: 'WWTW',
         receiving_water: 'RW',
+        data_center: 'AI_DC',
       }[kind];
       let sequence = 1;
       while (nodes.some((node) => node.id === `${prefix}${sequence}`)) sequence += 1;

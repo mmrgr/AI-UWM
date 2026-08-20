@@ -33,7 +33,7 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-当前验证结果为 `26 passed`。安装后可使用 `watermet2` 命令；若环境没有刷新命令入口，可用 `python -m watermet2_repro.cli` 替代。
+当前验证结果为 `49 passed`。安装后可使用 `watermet2` 命令；若环境没有刷新命令入口，可用 `python -m watermet2_repro.cli` 替代。
 
 ### 可视化前端
 
@@ -71,6 +71,17 @@ watermet2 run examples\demo_full\project.json --output output\demo
 ```
 
 完整示例包含两套水源—WTW—水池—配水链、室内/工业/季节需求、RWH、GWR、中心回用、混合排水、两座 WWTW、受纳水体、BOD/TSS/TN/TP、污泥与资源回收、管道更新和分期干预。
+
+### AI算力与城市水承载力示例
+
+项目现已支持一等 `data_center` 组件、六类冷却技术、potable/reclaimed联合供水、冷却塔质量守恒、blowdown→WWTW→reuse闭环、峰值KPI、0–2 GW扫描、承载边界、复合情景、Monte Carlo、Morris/Sobol及Pareto策略。完整方法见 [AI_DATA_CENTER_RESEARCH_CN.md](AI_DATA_CENTER_RESEARCH_CN.md)。
+研究参数先验位于 `data/ai_data_center_database.json`；示例通过 `ai_database_file` 引用，项目内显式参数始终优先。
+
+```powershell
+watermet2 run examples\ai_data_center\project.json --output output\ai_city
+watermet2 ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100
+watermet2 ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
+```
 
 若只想重现论文 Oslo 图表：
 
@@ -130,6 +141,7 @@ date,rainfall_mm,temperature_c,source_inflow_ml,population
 | `sewer` | sanitary、storm 或 combined 排水 | `sewer_type`, `capacity_mode`, `capacity_ml`, `release_a`, `release_b` |
 | `wwtw` | 污水厂 | `daily_capacity_ml`, `pollutant_removal_fraction` |
 | `receiving_water` | 河流、湖泊或海域 | 无必填水力参数 |
+| `data_center` | AI算力中心 | `installed_it_capacity_mw`, `load_factor`, `pue_mode`, `cooling`, `water_sources` |
 
 每条 `supply_paths` 必须从 `water_resource` 开始，以 `distribution_main` 结束。同一 Local area 的所有路径 `allocation` 合计必须为 1。污水设施通过 `wastewater_connections` 连接，分流比例用 `fraction`。
 

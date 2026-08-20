@@ -15,6 +15,7 @@ from .analysis import (
     pareto_grid_optimize,
 )
 from .full_engine import FullWaterMet2Model, load_project
+from .ai_capacity import find_ai_carrying_capacity, scan_ai_capacity
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -154,6 +155,34 @@ def command_optimize(args: argparse.Namespace) -> None:
     print(trials.to_string(index=False))
 
 
+def command_ai_scan(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    frame = scan_ai_capacity(project, timeseries, args.min_mw, args.max_mw, args.step_mw)
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    print(frame.to_string(index=False))
+
+
+def command_ai_threshold(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    specification = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    frame = scan_ai_capacity(
+        project, timeseries,
+        float(specification.get("min_mw", 0)),
+        float(specification.get("max_mw", 2000)),
+        float(specification.get("step_mw", 25)),
+        capacities_mw=specification.get("capacities_mw"),
+    )
+    result = find_ai_carrying_capacity(frame, specification["constraints"])
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    result["capacity_scan"].to_csv(output / "ai_capacity_threshold.csv", index=False)
+    summary = {key: value for key, value in result.items() if key != "capacity_scan"}
+    _write_json(output / "ai_capacity_threshold.json", summary)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="watermet2", description="开放式 WaterMet² 全功能分析引擎")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -213,6 +242,22 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--spec", required=True)
     optimize.add_argument("--output", default="output/pareto_trials.csv")
     optimize.set_defaults(func=command_optimize)
+
+    ai_scan = subparsers.add_parser("ai-scan", help="扫描AI容量与城市水压力")
+    ai_scan.add_argument("project")
+    ai_scan.add_argument("--timeseries")
+    ai_scan.add_argument("--min-mw", type=float, default=0)
+    ai_scan.add_argument("--max-mw", type=float, default=2000)
+    ai_scan.add_argument("--step-mw", type=float, default=25)
+    ai_scan.add_argument("--output", default="output/ai_capacity_scan.csv")
+    ai_scan.set_defaults(func=command_ai_scan)
+
+    ai_threshold = subparsers.add_parser("ai-threshold", help="识别AI水资源承载边界")
+    ai_threshold.add_argument("project")
+    ai_threshold.add_argument("--timeseries")
+    ai_threshold.add_argument("--spec", required=True)
+    ai_threshold.add_argument("--output", default="output/ai_threshold")
+    ai_threshold.set_defaults(func=command_ai_threshold)
     return parser
 
 

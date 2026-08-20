@@ -1,0 +1,13 @@
+{
+  "min_mw": 0,
+  "max_mw": 2000,
+  "step_mw": 100,
+  "constraints": {
+    "system_reliability_fraction": {"operator": ">=", "value": 0.99},
+    "domestic_unmet_ml": {"operator": "<=", "value": 0},
+    "max_wtw_utilization": {"operator": "<=", "value": 0.95},
+    "max_wwtw_utilization": {"operator": "<=", "value": 1.05},
+    "max_reuse_utilization": {"operator": "<=", "value": 1.0},
+    "peak_capacity_ratio": {"operator": "<=", "value": 1}
+  }
+}

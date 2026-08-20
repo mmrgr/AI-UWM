@@ -18,6 +18,7 @@ SUPPORTED_KINDS = {
     "wwtw",
     "receiving_water",
     "reuse",
+    "data_center",
 }
 
 SUPPLY_KINDS = {
@@ -90,6 +91,11 @@ def validate_project(project: dict[str, Any], timeseries: pd.DataFrame) -> None:
     supply_paths = project.get("supply_paths", [])
     subcatchments = project.get("subcatchments", {})
     indoor_areas = project.get("indoor_areas", {})
+    if project.get("demand_allocation_policy", "priority") not in {
+        "priority", "resident_first", "proportional", "ai_first",
+        "policy_a", "policy_b", "policy_c",
+    }:
+        errors.append("demand_allocation_policy 无效")
 
     if not simulation.get("start") or not simulation.get("end"):
         errors.append("simulation.start 和 simulation.end 必须提供")
@@ -135,6 +141,62 @@ def validate_project(project: dict[str, Any], timeseries: pd.DataFrame) -> None:
             "resource_type", "surface"
         ) not in {"surface", "groundwater", "desalination", "imported"}:
             errors.append(f"水源组件 {component_id} resource_type 无效")
+        if kind == "data_center":
+            if component.get("local_area") not in local_areas:
+                errors.append(
+                    f"数据中心 {component_id} 引用了不存在的 local_area={component.get('local_area')}"
+                )
+            if float(component.get("installed_it_capacity_mw", 0.0)) < 0:
+                errors.append(f"数据中心 {component_id}.installed_it_capacity_mw 不能为负")
+            for entry in component.get("capacity_schedule", []):
+                try:
+                    pd.Timestamp(entry["date"])
+                    if float(entry["capacity_mw"]) < 0:
+                        errors.append(f"数据中心 {component_id}.capacity_schedule 容量不能为负")
+                except (KeyError, TypeError, ValueError):
+                    errors.append(f"数据中心 {component_id}.capacity_schedule 格式无效")
+            load = component.get("load", {})
+            if not 0 <= float(component.get("load_factor", load.get("factor", 0.0))) <= 1:
+                errors.append(f"数据中心 {component_id}.load_factor 必须位于 [0,1]")
+            cooling = component.get("cooling", {})
+            if float(component.get("base_pue", component.get("pue", 1.2))) < 1:
+                errors.append(f"数据中心 {component_id}.base_pue 不能小于 1")
+            storage_capacity = float(component.get("cooling_storage_capacity_ml", component.get("cooling_storage_ml", 0.0)))
+            storage_initial = float(component.get("initial_cooling_storage_ml", 0.0))
+            if storage_capacity < 0 or storage_initial < 0 or storage_initial > storage_capacity:
+                errors.append(f"数据中心 {component_id} 冷却水储量配置无效")
+            if cooling.get("technology", "evaporative") not in {
+                "evaporative", "efficient_evaporative", "hybrid", "dry",
+                "liquid_to_air", "liquid_to_water", "liquid_air", "liquid_water",
+            }:
+                errors.append(f"数据中心 {component_id}.cooling.technology 无效")
+            if float(cooling.get("cycles_of_concentration", 5.0)) <= 1:
+                errors.append(f"数据中心 {component_id} 浓缩倍数必须大于 1")
+            if cooling.get("coc_mode", "fixed") not in {"fixed", "quality_limited"}:
+                errors.append(f"数据中心 {component_id}.cooling.coc_mode 无效")
+            for field in ("drift_fraction", "drift_fraction_of_makeup", "blowdown_return_fraction", "internal_recovery_fraction"):
+                if field in cooling and not 0 <= float(cooling[field]) <= 1:
+                    errors.append(f"数据中心 {component_id}.cooling.{field} 必须位于 [0,1]")
+            if any(float(value) <= 0 for value in cooling.get("water_quality_limits", {}).values()):
+                errors.append(f"数据中心 {component_id}.cooling.water_quality_limits 必须为正")
+            source_total = sum(
+                float(source.get("target_fraction", 0.0))
+                for source in component.get("water_sources", {}).values()
+            )
+            if component.get("water_sources") and abs(source_total - 1.0) > 1e-6:
+                errors.append(
+                    f"数据中心 {component_id}.water_sources.target_fraction 合计应为 1"
+                )
+            for source in component.get("water_sources", {}).values():
+                for key in ("available_ml_day", "constant_available_ml_day"):
+                    if key in source and float(source[key]) < 0:
+                        errors.append(f"数据中心 {component_id}.water_sources.{key} 不能为负")
+            load_mode = component.get("load_mode", load.get("mode", "fixed"))
+            load_column = component.get("load_factor_column", load.get("timeseries_column"))
+            if load_mode == "timeseries" and not load_column:
+                errors.append(f"数据中心 {component_id} timeseries负荷模式必须配置列名")
+            if load_mode not in {"fixed", "timeseries", "profile"}:
+                errors.append(f"数据中心 {component_id}.load_mode 无效")
 
         for field in (
             "capital_cost_eur",
@@ -216,6 +278,15 @@ def validate_project(project: dict[str, Any], timeseries: pd.DataFrame) -> None:
     for component in components.values():
         if component.get("inflow_column"):
             required_columns.add(component["inflow_column"])
+        if component.get("kind") == "data_center":
+            load = component.get("load", {})
+            if component.get("load_mode", load.get("mode")) == "timeseries":
+                column = component.get("load_factor_column", load.get("timeseries_column"))
+                if column:
+                    required_columns.add(column)
+            for source in component.get("water_sources", {}).values():
+                if source.get("availability_column"):
+                    required_columns.add(source["availability_column"])
     for area in local_areas.values():
         if area.get("population_column"):
             required_columns.add(area["population_column"])

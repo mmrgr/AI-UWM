@@ -22,6 +22,7 @@ const kindLabels: Record<ComponentKind, string> = {
   wwtw: '污水处理厂',
   receiving_water: '受纳水体',
   local_area: '城市区域',
+  data_center: 'AI算力中心',
 };
 
 function asString(value: unknown, fallback: string): string {
@@ -39,6 +40,7 @@ function flowType(source: ComponentKind, target: ComponentKind): WaterFlowType {
   if (source === 'reuse') return 'reclaimed_water';
   if (source === 'sewer' || source === 'wwtw') return 'wastewater';
   if (source === 'water_resource' || target === 'wtw') return 'raw_water';
+  if (target === 'data_center') return 'potable_water';
   return 'potable_water';
 }
 
@@ -179,6 +181,12 @@ export function projectToGraph(project: WaterMetProject): {
       const centralReuse = component.central_reuse_component;
       if (typeof centralReuse === 'string') {
         add(componentId, centralReuse, 1, 5000 + componentIndex);
+      }
+    }
+    if (componentKind(component) === 'data_center') {
+      const area = component.local_area;
+      if (typeof area === 'string') {
+        add(area, componentId, 1, 6000 + componentIndex);
       }
     }
   });

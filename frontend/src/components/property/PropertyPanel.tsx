@@ -35,6 +35,14 @@ const assetFields: FieldSpec[] = [
   { key: 'maintenance_fraction_capital_year', label: '维护成本比例', unit: '1/year', min: 0, help: '每年维护费占资本成本的比例。' },
 ];
 
+const aiFields: FieldSpec[] = [
+  { key: 'installed_it_capacity_mw', label: 'Installed IT Capacity', unit: 'MW', required: true, min: 0, help: 'IT设备额定功率。' },
+  { key: 'load_factor', label: '负荷率', unit: '0–1', required: true, min: 0, max: 1, help: '每日IT容量利用率。' },
+  { key: 'base_pue', label: '基础 PUE', required: true, min: 1, help: '园区总电量与IT电量之比。' },
+  { key: 'cooling_storage_ml', label: '冷却水储量', unit: 'ML', min: 0, help: '冷却系统可用调蓄容量。' },
+  { key: 'offsite_electricity_water_intensity_l_kwh', label: '异地电力耗水', unit: 'L/kWh', min: 0, help: '仅计入水足迹，不进入城市物理水量平衡。' },
+];
+
 function readNumber(config: ProjectObject, key: string): string {
   const value = config[key];
   return typeof value === 'number' ? String(value) : '';
@@ -185,6 +193,53 @@ export function PropertyPanel() {
             ))}
           </details>
         ))}
+        {node.data.nodeType === 'data_center' && (
+          <details open>
+            <summary>AI · Energy · Cooling · Water</summary>
+            {aiFields.map((field) => (
+              <NumberField key={field.key} field={field} config={node.data.config} highlighted={field.key === focusField} onChange={setNumber} />
+            ))}
+            <label className="form-field">
+              <span>所属城市区域 <b>*</b></span>
+              <input value={typeof node.data.config.local_area === 'string' ? node.data.config.local_area : ''} onChange={(event) => updateConfig(node.id, { local_area: event.target.value })} />
+            </label>
+            <label className="form-field">
+              <span>PUE 模式</span>
+              <select value={typeof node.data.config.pue_mode === 'string' ? node.data.config.pue_mode : 'dynamic'} onChange={(event) => updateConfig(node.id, { pue_mode: event.target.value })}>
+                <option value="fixed">fixed_pue</option><option value="dynamic">dynamic_pue</option>
+              </select>
+            </label>
+            <label className="form-field">
+              <span>冷却技术</span>
+              <select
+                value={typeof (node.data.config.cooling as ProjectObject | undefined)?.technology === 'string' ? String((node.data.config.cooling as ProjectObject).technology) : 'evaporative'}
+                onChange={(event) => updateConfig(node.id, { cooling: { ...((node.data.config.cooling as ProjectObject | undefined) ?? {}), technology: event.target.value } })}
+              >
+                {['evaporative', 'efficient_evaporative', 'hybrid', 'dry', 'liquid_to_air', 'liquid_to_water'].map((technology) => <option key={technology}>{technology}</option>)}
+              </select>
+            </label>
+            <label className="form-field">
+              <span>浓缩倍数 CoC</span>
+              <input
+                type="number" min="1.000001" step="0.1"
+                value={typeof (node.data.config.cooling as ProjectObject | undefined)?.cycles_of_concentration === 'number' ? String((node.data.config.cooling as ProjectObject).cycles_of_concentration) : '5'}
+                onChange={(event) => updateConfig(node.id, { cooling: { ...((node.data.config.cooling as ProjectObject | undefined) ?? {}), cycles_of_concentration: Number(event.target.value) } })}
+              />
+            </label>
+            <label className="form-field">
+              <span>再生水目标比例 <small>0–1</small></span>
+              <input
+                type="number" min="0" max="1" step="0.05"
+                value={String((((node.data.config.water_sources as ProjectObject | undefined)?.reclaimed as ProjectObject | undefined)?.target_fraction as number | undefined) ?? 0.7)}
+                onChange={(event) => {
+                  const reclaimed = Number(event.target.value);
+                  const sources = (node.data.config.water_sources as ProjectObject | undefined) ?? {};
+                  updateConfig(node.id, { water_sources: { ...sources, reclaimed: { ...((sources.reclaimed as ProjectObject | undefined) ?? {}), target_fraction: reclaimed }, potable: { ...((sources.potable as ProjectObject | undefined) ?? {}), target_fraction: 1 - reclaimed } } });
+                }}
+              />
+            </label>
+          </details>
+        )}
         <details open={focusField === 'base_population'}>
           <summary>时间序列与区域</summary>
           {node.data.nodeType === 'water_resource' && (

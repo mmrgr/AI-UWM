@@ -12,6 +12,7 @@ export type ComponentKind =
   | 'sewer'
   | 'wwtw'
   | 'receiving_water'
+  | 'data_center'
   | 'local_area';
 
 export type WaterFlowType =
@@ -46,6 +47,6 @@ export type StudioEdge = Edge<WaterMetEdgeData, 'watermet'>;
 export interface PaletteItem {
   nodeType: ComponentKind;
   label: string;
-  category: '供水系统' | '城市区域' | '回用系统' | '排水与污水';
+  category: '供水系统' | '城市区域' | 'AI基础设施' | '回用系统' | '排水与污水';
   description: string;
 }

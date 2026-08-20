@@ -23,6 +23,9 @@ from .analysis import (
     summarize_kpis,
 )
 from .full_engine import FullWaterMet2Model, load_project
+from .ai_capacity import find_ai_carrying_capacity, scan_ai_capacity
+from .ai_metrics import summarize_ai_water_kpis
+from .ai_scenarios import run_ai_scenario_matrix
 from .validation import ProjectValidationError, prepare_project, validate_project
 
 
@@ -90,6 +93,7 @@ def _result_tables(result: Any) -> dict[str, list[dict[str, Any]]]:
         "flood_daily",
         "risk_daily",
         "risk_summary",
+        "data_center_daily",
     )
     return {name: _frame_records(getattr(result, name)) for name in names}
 
@@ -141,13 +145,64 @@ def create_app(serve_frontend: bool = True) -> FastAPI:
     @app.post("/api/run")
     def run(payload: StudioPayload) -> dict[str, Any]:
         try:
-            _, _, result = _run_payload(payload)
+            project, _, result = _run_payload(payload)
         except (ProjectValidationError, KeyError, TypeError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {
             "summary": summarize_kpis(result),
+            "ai_water_summary": summarize_ai_water_kpis(result, project),
             "tables": _result_tables(result),
         }
+
+    @app.post("/api/ai/capacity-scan")
+    def ai_capacity_scan(payload: AnalysisPayload) -> dict[str, Any]:
+        try:
+            timeseries = _payload_frame(payload.timeseries)
+            project = prepare_project(payload.project)
+            validate_project(project, timeseries)
+            specification = payload.specification
+            frame = scan_ai_capacity(
+                project, timeseries,
+                min_mw=float(specification.get("min_mw", 0)),
+                max_mw=float(specification.get("max_mw", 2000)),
+                step_mw=float(specification.get("step_mw", 25)),
+                capacities_mw=specification.get("capacities_mw"),
+                data_center_id=specification.get("data_center_id"),
+            )
+        except (ProjectValidationError, KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"capacity_scan": _frame_records(frame)}
+
+    @app.post("/api/ai/carrying-capacity")
+    def ai_carrying_capacity(payload: AnalysisPayload) -> dict[str, Any]:
+        try:
+            timeseries = _payload_frame(payload.timeseries)
+            project = prepare_project(payload.project)
+            validate_project(project, timeseries)
+            specification = payload.specification
+            frame = scan_ai_capacity(
+                project, timeseries,
+                capacities_mw=specification.get("capacities_mw"),
+                min_mw=float(specification.get("min_mw", 0)),
+                max_mw=float(specification.get("max_mw", 2000)),
+                step_mw=float(specification.get("step_mw", 25)),
+            )
+            threshold = find_ai_carrying_capacity(frame, specification["constraints"])
+            threshold["capacity_scan"] = _frame_records(threshold["capacity_scan"])
+        except (ProjectValidationError, KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return threshold
+
+    @app.post("/api/ai/scenarios")
+    def ai_scenarios(payload: AnalysisPayload) -> dict[str, Any]:
+        try:
+            timeseries = _payload_frame(payload.timeseries)
+            project = prepare_project(payload.project)
+            validate_project(project, timeseries)
+            frame = run_ai_scenario_matrix(project, timeseries, payload.specification["scenarios"])
+        except (ProjectValidationError, KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"scenarios": _frame_records(frame)}
 
     @app.post("/api/dss")
     def dss(payload: DecisionPayload) -> dict[str, Any]:

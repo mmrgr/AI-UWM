@@ -94,6 +94,23 @@ export function runDataChecker(
         });
       }
     }
+    if (node.data.nodeType === 'data_center') {
+      const capacity = numeric(node.data.config, 'installed_it_capacity_mw');
+      if (capacity === undefined || capacity < 0) {
+        diagnostics.push({
+          id: `ai-capacity-${node.id}`, severity: 'error', code: 'AI_CAPACITY',
+          title: 'AI容量未配置', message: `${node.data.label} 需要非负 installed IT capacity。`,
+          nodeId: node.id, field: 'installed_it_capacity_mw',
+        });
+      }
+      if (typeof node.data.config.local_area !== 'string') {
+        diagnostics.push({
+          id: `ai-area-${node.id}`, severity: 'error', code: 'AI_LOCAL_AREA',
+          title: 'AI所属区域未配置', message: `${node.data.label} 需要绑定城市区域。`,
+          nodeId: node.id, field: 'local_area',
+        });
+      }
+    }
   }
   const allocationKinds = new Set([
     'water_resource',
@@ -244,9 +261,10 @@ export function isConnectionAllowed(
     wtw: ['trunk_main', 'service_reservoir'],
     trunk_main: ['service_reservoir', 'distribution_main'],
     service_reservoir: ['distribution_main'],
-    distribution_main: ['local_area'],
-    local_area: ['reuse', 'sewer'],
-    reuse: ['local_area'],
+    distribution_main: ['local_area', 'data_center'],
+    local_area: ['reuse', 'sewer', 'data_center'],
+    data_center: ['sewer'],
+    reuse: ['local_area', 'data_center'],
     sewer: ['wwtw', 'receiving_water'],
     wwtw: ['reuse', 'receiving_water'],
   };

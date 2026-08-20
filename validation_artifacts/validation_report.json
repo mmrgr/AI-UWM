@@ -199,7 +199,7 @@
     {
       "name": "Python Toolkit读写运行检索",
       "passed": true,
-      "detail": "结果表=12, 组件=21, 周聚合可用"
+      "detail": "结果表=13, 组件=21, 周聚合可用"
     },
     {
       "name": "AHP权重、一致性与排序",

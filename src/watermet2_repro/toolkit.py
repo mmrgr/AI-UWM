@@ -10,6 +10,8 @@ import pandas as pd
 from .analysis import DecisionProblemResult, evaluate_decision_problem
 from .full_engine import FullModelResult, FullWaterMet2Model, _aggregate_frame, load_project
 from .validation import prepare_project, validate_project
+from .ai_capacity import find_ai_carrying_capacity, scan_ai_capacity
+from .ai_metrics import summarize_ai_water_kpis
 
 
 def _resolve(root: Any, path: str) -> tuple[Any, str]:
@@ -111,6 +113,7 @@ class WaterMet2Toolkit:
         area_id: str | None = None,
         subcatchment_id: str | None = None,
         indoor_id: str | None = None,
+        data_center_id: str | None = None,
         risk_code: str | None = None,
         columns: list[str] | None = None,
         start: str | pd.Timestamp | None = None,
@@ -125,6 +128,7 @@ class WaterMet2Toolkit:
             "area_id": area_id,
             "subcatchment_id": subcatchment_id,
             "indoor_id": indoor_id,
+            "data_center_id": data_center_id,
             "risk_code": risk_code,
         }
         for column, value in filters.items():
@@ -146,7 +150,7 @@ class WaterMet2Toolkit:
             raise ValueError("frequency must be daily, weekly, monthly, or annual")
         if frequencies[frequency] is not None:
             identifier_candidates = (
-                "subcatchment_id", "area_id", "indoor_id", "local_area",
+                "subcatchment_id", "area_id", "indoor_id", "data_center_id", "local_area",
                 "component_id", "kind", "stream", "pollutant", "product",
                 "unit", "asset_id", "risk_code",
             )
@@ -181,3 +185,17 @@ class WaterMet2Toolkit:
         return evaluate_decision_problem(
             copy.deepcopy(self.project), self.timeseries.copy(), specification
         )
+
+    def summarize_ai_water_kpis(self) -> dict[str, float]:
+        if self.result is None:
+            raise RuntimeError("尚未运行模型")
+        return summarize_ai_water_kpis(self.result, self.project)
+
+    def scan_ai_capacity(self, **options: Any) -> pd.DataFrame:
+        self.validate()
+        return scan_ai_capacity(copy.deepcopy(self.project), self.timeseries.copy(), **options)
+
+    def find_ai_carrying_capacity(
+        self, constraints: dict[str, Any], **scan_options: Any
+    ) -> dict[str, Any]:
+        return find_ai_carrying_capacity(self.scan_ai_capacity(**scan_options), constraints)

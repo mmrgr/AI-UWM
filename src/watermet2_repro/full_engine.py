@@ -10,6 +10,7 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
+from .data_center import apply_data_center_database, calculate_data_center_plan, finalize_data_center_day
 from .validation import ProjectValidationError, prepare_project, validate_project
 
 
@@ -76,6 +77,11 @@ def load_project(project_path: str | Path, timeseries_path: str | Path | None = 
         database = json.loads(database_path.read_text(encoding="utf-8"))
         for key, value in database.items():
             project.setdefault(key, value)
+    if project.get("ai_database_file"):
+        ai_database_path = project_path.parent / project["ai_database_file"]
+        project["ai_data_center_database"] = json.loads(
+            ai_database_path.read_text(encoding="utf-8")
+        )
     project = prepare_project(project)
     if timeseries_path is None:
         timeseries_path = project_path.parent / project.get("timeseries_file", "timeseries.csv")
@@ -191,6 +197,7 @@ class FullModelResult:
     flood_daily: pd.DataFrame
     risk_daily: pd.DataFrame
     risk_summary: pd.DataFrame
+    data_center_daily: pd.DataFrame
 
     def write(self, output_dir: str | Path) -> None:
         output = Path(output_dir)
@@ -207,6 +214,7 @@ class FullModelResult:
         self.flood_daily.to_csv(output / "flood_daily.csv", index=False)
         self.risk_daily.to_csv(output / "risk_daily.csv", index=False)
         self.risk_summary.to_csv(output / "risk_summary.csv", index=False)
+        self.data_center_daily.to_csv(output / "data_center_daily.csv", index=False)
         tables = {
             "system": (self.system_daily, []),
             "subcatchment": (self.subcatchment_daily, ["subcatchment_id"]),
@@ -224,6 +232,7 @@ class FullModelResult:
             "asset": (self.asset_daily, ["asset_id", "component_id"]),
             "flood": (self.flood_daily, ["component_id"]),
             "risk": (self.risk_daily, ["risk_code"]),
+            "data_center": (self.data_center_daily, ["data_center_id"]),
         }
         for name, (frame, identifiers) in tables.items():
             if frame.empty:
@@ -248,6 +257,7 @@ class FullWaterMet2Model:
     snowpack_mm: dict[str, float] = field(default_factory=dict)
     previous_snow_depth_mm: dict[str, float] = field(default_factory=dict)
     pipeline_state: dict[str, dict[str, Any]] = field(default_factory=dict)
+    data_center_storage: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.project = prepare_project(self.project)
@@ -268,6 +278,11 @@ class FullWaterMet2Model:
         self.pipeline_state = {
             pipe["id"]: copy.deepcopy(pipe) for pipe in self.project.get("pipelines", [])
         }
+        self.data_center_storage = {
+            component_id: float(component.get("initial_cooling_storage_ml", 0.0))
+            for component_id, component in self.project["components"].items()
+            if component["kind"] == "data_center"
+        }
         for pipeline in self.pipeline_state.values():
             pipeline.setdefault(
                 "reference_age_years", float(pipeline.get("age_years", 0.0))
@@ -287,6 +302,8 @@ class FullWaterMet2Model:
         self._pollutant_rows: list[dict[str, Any]] = []
         self._recovery_rows: list[dict[str, Any]] = []
         self._material_rows: list[dict[str, Any]] = []
+        self._data_center_rows: list[dict[str, Any]] = []
+        self._data_center_plans: dict[str, dict[str, Any]] = {}
         self._interventions = sorted(self.project.get("interventions", []), key=lambda item: item["date"])
         self._applied_interventions: set[str] = set()
 
@@ -313,6 +330,7 @@ class FullWaterMet2Model:
             flood_daily=pd.DataFrame(),
             risk_daily=pd.DataFrame(),
             risk_summary=pd.DataFrame(),
+            data_center_daily=pd.DataFrame(self._data_center_rows),
         )
         from .risk import evaluate_risks
 
@@ -330,9 +348,11 @@ class FullWaterMet2Model:
         self._apply_annual_pipeline_rehabilitation(date, metrics)
         capacity_used: defaultdict[str, float] = defaultdict(float)
         area_state = self._calculate_area_inputs(date, row)
+        self._prepare_data_centers(date, row, area_state)
         self._process_reuse(date, area_state, metrics)
         self._initialize_water_storages(row, metrics)
         self._supply_potable_water(date, area_state, metrics, capacity_used)
+        self._finalize_data_centers(date, area_state, metrics)
         wastewater_inputs = self._create_wastewater_inputs(area_state)
         self._route_wastewater(date, wastewater_inputs, metrics)
         self._apply_pipeline_events(date, metrics)
@@ -511,6 +531,10 @@ class FullWaterMet2Model:
                 "demand": dict(demands),
                 "remaining": dict(demands),
                 "return_fractions": return_fractions,
+                "minimum_service_fractions": {
+                    profile["name"]: float(profile.get("minimum_service_fraction", 0.0))
+                    for profile in area.get("demand_profiles", [])
+                },
                 "runoff_ml": runoff,
                 "runoff_remaining_ml": runoff,
                 "sanitary_pollutants": pollutants,
@@ -526,6 +550,7 @@ class FullWaterMet2Model:
                 "appliance_annualized_capital_cost_eur": appliance_annualized_capital_cost,
                 "reuse_delivered": defaultdict(float),
                 "potable_delivered": defaultdict(float),
+                "other_delivered": defaultdict(float),
                 "unmet": defaultdict(float),
                 "grey_available_ml": self._greywater_available(area, demands),
                 "grey_captured_ml": 0.0,
@@ -533,6 +558,163 @@ class FullWaterMet2Model:
                 "indoor_populations": indoor_populations,
             }
         return states
+
+    def _prepare_data_centers(
+        self,
+        date: pd.Timestamp,
+        row: pd.Series,
+        area_state: dict[str, dict[str, Any]],
+    ) -> None:
+        """Translate each data-centre operating plan into source-specific demand."""
+        self._data_center_plans = {}
+        for component_id, component in self.project["components"].items():
+            if (
+                component.get("kind") != "data_center"
+                or not component.get("active", True)
+                or not self._component_active(component, date)
+            ):
+                continue
+
+            area_id = component.get("local_area")
+            if area_id not in area_state:
+                continue
+
+            weather = self.project["local_areas"][area_id].get("weather_columns", {})
+            temperature_column = weather.get("temperature", "temperature_c")
+            humidity_column = weather.get("relative_humidity", "relative_humidity_pct")
+            load_column = component.get("load", {}).get("timeseries_column")
+            drivers = {
+                "temperature_c": getattr(row, temperature_column, None),
+                "relative_humidity_pct": getattr(row, humidity_column, None),
+                "load_factor": getattr(row, load_column, None) if load_column else None,
+            }
+            component = apply_data_center_database(
+                component, self.project.get("ai_data_center_database")
+            )
+            plan = calculate_data_center_plan(component, date, drivers)
+            storage_start = float(self.data_center_storage.get(component_id, 0.0))
+            storage_capacity = float(
+                component.get("cooling_storage_capacity_ml", component.get("cooling_storage_ml", storage_start))
+            )
+            storage_refill = (
+                max(0.0, storage_capacity - storage_start)
+                if plan.external_makeup_ml > 0
+                else 0.0
+            )
+            request = max(0.0, plan.external_makeup_ml + storage_refill)
+            category = f"data_center::{component_id}"
+            state = area_state[area_id]
+            state["demand"][category] = request
+            state["remaining"][category] = request
+            state["return_fractions"][category] = 0.0
+            state["minimum_service_fractions"][category] = float(
+                component.get("minimum_service_fraction", 0.0)
+            )
+
+            sources = component.get("water_sources", {})
+            reclaimed = sources.get("reclaimed", {})
+            potable = sources.get("potable", {})
+            other = sources.get("other", {})
+            reclaimed_target = float(
+                reclaimed.get("target_fraction", plan.target_reclaimed_fraction)
+            )
+            potable_target = float(potable.get("target_fraction", max(0.0, 1.0 - reclaimed_target)))
+            state.setdefault("reuse_limits", {})[category] = request * reclaimed_target
+            state.setdefault("potable_limits", {})[category] = (
+                request
+                if potable.get("allow_fallback", component.get("water_fallback", True))
+                else request * potable_target
+            )
+            other_target = float(other.get("target_fraction", 0.0))
+            availability_column = other.get("availability_column")
+            other_available = float(
+                getattr(row, availability_column, 0.0)
+                if availability_column
+                else other.get("available_ml_day", other.get("constant_available_ml_day", 0.0))
+            )
+            other_amount = min(request * other_target, max(0.0, other_available))
+            state["other_delivered"][category] += other_amount
+            state["remaining"][category] -= other_amount
+            self._data_center_plans[component_id] = {
+                "component": component,
+                "plan": plan,
+                "area_id": area_id,
+                "category": category,
+                "storage_start_ml": storage_start,
+                "storage_capacity_ml": storage_capacity,
+                "reclaimed_component_id": reclaimed.get("component_id"),
+            }
+
+    def _finalize_data_centers(
+        self,
+        date: pd.Timestamp,
+        area_state: dict[str, dict[str, Any]],
+        metrics: dict[str, dict[str, float]],
+    ) -> None:
+        """Close cooling-water balances and add blowdown to the local sewer."""
+        for component_id, context in self._data_center_plans.items():
+            component = context["component"]
+            plan = context["plan"]
+            area_id = context["area_id"]
+            category = context["category"]
+            state = area_state[area_id]
+            reclaimed_ml = sum(
+                float(amount)
+                for (_reuse_type, delivered_category), amount in state.get("reuse_delivered", {}).items()
+                if delivered_category == category
+            )
+            potable_ml = float(state.get("potable_delivered", {}).get(category, 0.0))
+            other_ml = float(state.get("other_delivered", {}).get(category, 0.0))
+            result = finalize_data_center_day(
+                plan,
+                external_withdrawal_ml=reclaimed_ml + potable_ml + other_ml,
+                reclaimed_water_ml=reclaimed_ml,
+                potable_water_ml=potable_ml,
+                other_water_ml=other_ml,
+                storage_start_ml=context["storage_start_ml"],
+                storage_capacity_ml=context["storage_capacity_ml"],
+            )
+            self.data_center_storage[component_id] = result["storage_end_ml"]
+
+            return_flow = result["return_flow_ml"]
+            state["data_center_return_ml"] = state.get("data_center_return_ml", 0.0) + return_flow
+            quality = component.get("blowdown_quality_mg_l", component.get("cooling", {}).get("blowdown_quality_mg_l", {}))
+            pollutants = state.setdefault("data_center_return_pollutants", {})
+            component_pollutants: dict[str, float] = {}
+            for pollutant, concentration in quality.items():
+                mass = return_flow * float(concentration)
+                pollutants[pollutant] = pollutants.get(pollutant, 0.0) + mass
+                component_pollutants[pollutant] = mass
+            self._record_pollutants(date, component_id, "blowdown", component_pollutants)
+
+            metric = metrics[component_id]
+            metric["inflow_ml"] += result["external_withdrawal_ml"]
+            metric["outflow_ml"] += return_flow
+            metric["loss_ml"] += result["consumption_ml"]
+            metric["storage_ml"] = result["storage_end_ml"]
+            electricity = plan.facility_energy_mwh * 1000.0
+            metric["electricity_kwh"] += electricity
+            electricity_factor = self.project.get("energy_sources", {}).get("electricity", {})
+            ghg = electricity * float(electricity_factor.get("ghg_kg_co2e_unit", 0.0))
+            acid = electricity * float(electricity_factor.get("acid_kg_so2e_unit", 0.0))
+            eutro = electricity * float(electricity_factor.get("eutro_kg_po4e_unit", 0.0))
+            metric["ghg_caused_kg_co2e"] += ghg
+            metric["electricity_ghg_kg_co2e"] += ghg
+            metric["acidification_caused_kg_so2e"] += acid
+            metric["electricity_acidification_kg_so2e"] += acid
+            metric["eutrophication_caused_kg_po4e"] += eutro
+            metric["electricity_eutrophication_kg_po4e"] += eutro
+            metric["operational_cost_eur"] += electricity * float(
+                electricity_factor.get("cost_eur_unit", 0.0)
+            )
+
+            row = {
+                "date": date,
+                "data_center_id": component_id,
+                "area_id": area_id,
+                **result,
+            }
+            self._data_center_rows.append(row)
 
     def _rainfall_runoff(
         self, area_id: str, area: dict[str, Any], date: pd.Timestamp, row: Any
@@ -766,15 +948,35 @@ class FullWaterMet2Model:
             treatment_capacity = float(component.get("treatment_capacity_ml_day", np.inf))
             available = min(self.storage[component_id], treatment_capacity)
             delivered = 0.0
-            eligible = component.get("eligible_demands", [])
+            eligible = list(component.get("eligible_demands", []))
+            if reuse_type == "central":
+                data_center_eligible: list[tuple[int, str]] = []
+                for context in self._data_center_plans.values():
+                    if context["area_id"] not in target_areas:
+                        continue
+                    configured_source = context.get("reclaimed_component_id")
+                    if configured_source and configured_source != component_id:
+                        continue
+                    if context["category"] not in eligible:
+                        source = context["component"].get("water_sources", {}).get("reclaimed", {})
+                        data_center_eligible.append((int(source.get("priority", 100)), context["category"]))
+                eligible = [category for _priority, category in sorted(data_center_eligible)] + eligible
             for area_id in target_areas:
                 state = area_state[area_id]
                 for category in eligible:
                     if available <= 0:
                         break
-                    requested = state["remaining"].get(category, 0.0)
+                    remaining = state["remaining"].get(category, 0.0)
+                    requested = remaining
+                    reuse_limit = state.get("reuse_limits", {}).get(category, np.inf)
+                    already_delivered = sum(
+                        amount
+                        for (_reuse_type, delivered_category), amount in state["reuse_delivered"].items()
+                        if delivered_category == category
+                    )
+                    requested = min(requested, max(0.0, reuse_limit - already_delivered))
                     amount = min(requested, available)
-                    state["remaining"][category] = requested - amount
+                    state["remaining"][category] = remaining - amount
                     state["reuse_delivered"][(reuse_type, category)] += amount
                     delivered += amount
                     available -= amount
@@ -837,7 +1039,18 @@ class FullWaterMet2Model:
     ) -> None:
         paths = sorted(self.project["supply_paths"], key=lambda item: int(item.get("priority", 100)))
         potable_requests = {
-            area_id: sum(state["remaining"].values()) for area_id, state in area_state.items()
+            area_id: sum(
+                min(
+                    remaining,
+                    max(
+                        0.0,
+                        state.get("potable_limits", {}).get(category, np.inf)
+                        - state["potable_delivered"].get(category, 0.0),
+                    ),
+                )
+                for category, remaining in state["remaining"].items()
+            )
+            for area_id, state in area_state.items()
         }
         for path in paths:
             area_id = path["local_area"]
@@ -846,7 +1059,15 @@ class FullWaterMet2Model:
             delivered = self._run_supply_path(
                 date, path, path_request, metrics, capacity_used
             )
-            self._allocate_potable_to_demands(state, delivered, path.get("demand_priority"))
+            self._allocate_potable_to_demands(
+                state,
+                delivered,
+                path.get("demand_priority"),
+                path.get(
+                    "allocation_policy",
+                    self.project.get("demand_allocation_policy", "priority"),
+                ),
+            )
 
         for area_id, state in area_state.items():
             for category, amount in state["remaining"].items():
@@ -995,13 +1216,52 @@ class FullWaterMet2Model:
 
     @staticmethod
     def _allocate_potable_to_demands(
-        state: dict[str, Any], delivered: float, priority: Iterable[str] | None
+        state: dict[str, Any],
+        delivered: float,
+        priority: Iterable[str] | None,
+        policy: str = "priority",
     ) -> None:
-        order = list(priority or state["remaining"].keys())
+        order = list(priority or [])
+        order.extend(category for category in state["remaining"] if category not in order)
+        order = [category for category in order if category in state["remaining"]]
+        if policy in {"resident_first", "policy_a"}:
+            order.sort(key=lambda category: category.startswith("data_center::"))
+        elif policy in {"ai_first", "policy_c"}:
+            order.sort(key=lambda category: not category.startswith("data_center::"))
+        elif policy not in {"priority", "proportional", "policy_b"}:
+            raise ProjectValidationError(f"未知需求分配政策 {policy!r}")
+
+        def available_for(category: str) -> float:
+            potable_limit = state.get("potable_limits", {}).get(category, np.inf)
+            return min(
+                state["remaining"].get(category, 0.0),
+                max(0.0, potable_limit - state["potable_delivered"].get(category, 0.0)),
+            )
+
         for category in order:
-            requested = state["remaining"].get(category, 0.0)
+            minimum = state.get("minimum_service_fractions", {}).get(category, 0.0)
+            already = state["demand"].get(category, 0.0) - state["remaining"].get(category, 0.0)
+            required = max(0.0, state["demand"].get(category, 0.0) * minimum - already)
+            amount = min(required, available_for(category), delivered)
+            state["remaining"][category] -= amount
+            state["potable_delivered"][category] += amount
+            delivered -= amount
+            if delivered <= 0:
+                return
+
+        if policy in {"proportional", "policy_b"}:
+            available = {category: available_for(category) for category in order}
+            total = sum(available.values())
+            fraction = min(1.0, delivered / total) if total else 0.0
+            for category, requested in available.items():
+                amount = requested * fraction
+                state["remaining"][category] -= amount
+                state["potable_delivered"][category] += amount
+            return
+        for category in order:
+            requested = available_for(category)
             amount = min(requested, delivered)
-            state["remaining"][category] = requested - amount
+            state["remaining"][category] -= amount
             state["potable_delivered"][category] += amount
             delivered -= amount
             if delivered <= 0:
@@ -1016,13 +1276,17 @@ class FullWaterMet2Model:
             delivered_by_category = defaultdict(float)
             for category, amount in state["potable_delivered"].items():
                 delivered_by_category[category] += amount
+            for category, amount in state.get("other_delivered", {}).items():
+                delivered_by_category[category] += amount
             for (_reuse_type, category), amount in state["reuse_delivered"].items():
                 delivered_by_category[category] += amount
-            sanitary = sum(
+            ordinary_sanitary = sum(
                 amount * state["return_fractions"].get(category, 0.95)
                 for category, amount in delivered_by_category.items()
             )
-            sanitary = max(0.0, sanitary - state["grey_captured_ml"])
+            ordinary_sanitary = max(0.0, ordinary_sanitary - state["grey_captured_ml"])
+            data_center_return = float(state.get("data_center_return_ml", 0.0))
+            sanitary = ordinary_sanitary + data_center_return
             state["sanitary_ml"] = sanitary
             sanitary_sewer = area.get("sanitary_sewer") or area.get("combined_sewer")
             storm_sewer = area.get("storm_sewer") or area.get("combined_sewer")
@@ -1032,9 +1296,11 @@ class FullWaterMet2Model:
                     state["demand"][name] * state["return_fractions"].get(name, 0.95)
                     for name in state["demand"]
                 )
-                fraction = sanitary / max(original_return, 1e-12)
+                fraction = ordinary_sanitary / max(original_return, 1e-12)
                 for pollutant, mass in state["sanitary_pollutants"].items():
                     inputs[sanitary_sewer]["pollutants"][pollutant] += mass * fraction
+                for pollutant, mass in state.get("data_center_return_pollutants", {}).items():
+                    inputs[sanitary_sewer]["pollutants"][pollutant] += mass
             if storm_sewer:
                 inputs[storm_sewer]["volume_ml"] += state["runoff_remaining_ml"]
                 for pollutant, mass in state["runoff_remaining_pollutants"].items():
@@ -2027,6 +2293,7 @@ class FullWaterMet2Model:
             demand_total = sum(state["demand"].values())
             potable_total = sum(state["potable_delivered"].values())
             reuse_total = sum(state["reuse_delivered"].values())
+            other_total = sum(state.get("other_delivered", {}).values())
             unmet_total = sum(state["unmet"].values())
             row: dict[str, Any] = {
                 "date": date,
@@ -2035,9 +2302,10 @@ class FullWaterMet2Model:
                 "water_demand_ml": demand_total,
                 "potable_delivered_ml": potable_total,
                 "reuse_delivered_ml": reuse_total,
-                "delivered_total_ml": potable_total + reuse_total,
+                "other_delivered_ml": other_total,
+                "delivered_total_ml": potable_total + reuse_total + other_total,
                 "unmet_ml": unmet_total,
-                "delivered_percent": 100 * (potable_total + reuse_total) / demand_total if demand_total else 100.0,
+                "delivered_percent": 100 * (potable_total + reuse_total + other_total) / demand_total if demand_total else 100.0,
                 "runoff_ml": state["runoff_ml"],
                 "runoff_to_sewer_ml": state["runoff_remaining_ml"],
                 "sanitary_sewage_ml": state.get("sanitary_ml", 0.0),
@@ -2052,6 +2320,7 @@ class FullWaterMet2Model:
             for category, value in state["demand"].items():
                 row[f"demand_{category}_ml"] = value
                 row[f"potable_{category}_ml"] = state["potable_delivered"].get(category, 0.0)
+                row[f"other_{category}_ml"] = state.get("other_delivered", {}).get(category, 0.0)
                 row[f"unmet_{category}_ml"] = state["unmet"].get(category, 0.0)
             for (reuse_type, category), value in state["reuse_delivered"].items():
                 row[f"{reuse_type}_{category}_ml"] = value
@@ -2099,6 +2368,7 @@ class FullWaterMet2Model:
                 "water_demand_ml": sum(row["water_demand_ml"] for row in area_rows_today),
                 "delivered_total_ml": sum(row["delivered_total_ml"] for row in area_rows_today),
                 "potable_delivered_ml": sum(row["potable_delivered_ml"] for row in area_rows_today),
+                "other_delivered_ml": sum(row.get("other_delivered_ml", 0.0) for row in area_rows_today),
                 "reuse_delivered_ml": sum(row["reuse_delivered_ml"] for row in area_rows_today),
                 "unmet_demand_ml": sum(row["unmet_ml"] for row in area_rows_today),
                 "population": sum(row["population"] for row in area_rows_today),
