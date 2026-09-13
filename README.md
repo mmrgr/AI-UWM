@@ -81,7 +81,25 @@ watermet2 run examples\demo_full\project.json --output output\demo
 watermet2 run examples\ai_data_center\project.json --output output\ai_city
 watermet2 ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100
 watermet2 ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
+watermet2 ai-sensitivity examples\ai_data_center\project.json --spec examples\ai_data_center\sensitivity.json
+watermet2 ai-probabilistic-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\probabilistic_threshold.json
+watermet2 ai-exceedance --samples output\ai_probabilistic_threshold.csv --proposed-mw 1000
+watermet2 ai-bottlenecks examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
+watermet2 ai-intraday examples\ai_data_center\project.json --output output\ai_intraday
+watermet2 ai-states examples\ai_data_center\project.json --output output\ai_states
+watermet2 ai-industrial examples\ai_data_center\project.json --output output\ai_industrial
+watermet2 ai-hourly-boundary examples\ai_data_center\project.json --spec examples\ai_data_center\hourly_boundary.json --output output\ai_hourly_boundary
+watermet2 ai-robustness examples\ai_data_center\project.json --spec examples\ai_data_center\robustness.json --output output\ai_robustness
+watermet2 ai-provenance examples\ai_data_center\project.json --output output\ai_provenance
 ```
+
+Studio API 还提供 `/api/ai/baseline`、`/api/ai/sensitivity`、
+`/api/ai/probabilistic-threshold`、`/api/ai/exceedance-probability`、
+`/api/ai/bottlenecks`、`/api/ai/intraday-proxy`、`/api/ai/hourly-boundary`、
+`/api/ai/states`、`/api/ai/industrial-control`、`/api/ai/robustness` 和
+`/api/ai/provenance`，用于把基准—反事实、参数敏感性、概率承载边界、
+瓶颈迁移/干预边际、S/G状态、工业对照、稳健性和证据链直接接入论文实验流程。
+`ai-intraday` 使用可替换的训练/推理日内负荷假设，并严格保持每日水量守恒；获得遥测后可直接替换 profile。
 
 若只想重现论文 Oslo 图表：
 

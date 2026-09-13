@@ -54,7 +54,14 @@ def find_ai_carrying_capacity(
     capacity_scan: pd.DataFrame,
     constraints: dict[str, Any],
 ) -> dict[str, Any]:
+    if capacity_scan.empty or "ai_capacity_mw" not in capacity_scan:
+        raise ValueError("capacity_scan must contain ai_capacity_mw rows")
+    capacity_scan = capacity_scan.sort_values("ai_capacity_mw").reset_index(drop=True)
+    if capacity_scan["ai_capacity_mw"].duplicated().any():
+        raise ValueError("ai_capacity_mw values must be unique")
     definitions = constraints.get("constraints", constraints)
+    if not definitions:
+        raise ValueError("at least one carrying-capacity constraint is required")
     evaluations: list[tuple[bool, str | None, float]] = []
     for row in capacity_scan.itertuples(index=False):
         failed: list[tuple[str, float]] = []
@@ -74,15 +81,118 @@ def find_ai_carrying_capacity(
     first_failed = float(capacity_scan.iloc[first_failed_index]["ai_capacity_mw"]) if first_failed_index is not None else None
     limiting = evaluations[first_failed_index][1] if first_failed_index is not None else None
     margin = evaluations[first_failed_index][2] if first_failed_index is not None else None
+    # A constrained system can re-enter feasibility after an intervention or
+    # source-switch threshold.  Keep the complete feasible set instead of
+    # incorrectly treating the largest safe point as the first boundary.
+    intervals: list[list[float]] = []
+    for index in safe_indices:
+        capacity = float(capacity_scan.iloc[index]["ai_capacity_mw"])
+        if not intervals or index - 1 not in safe_indices:
+            intervals.append([capacity, capacity])
+        else:
+            intervals[-1][1] = capacity
+    first_safe_before_failure = (
+        float(capacity_scan.iloc[first_failed_index - 1]["ai_capacity_mw"])
+        if first_failed_index is not None and first_failed_index > 0
+        and evaluations[first_failed_index - 1][0]
+        else None
+    )
     classified = capacity_scan.copy()
     classified["constraint_status"] = ["safe" if item[0] else "high_risk" for item in evaluations]
     if first_failed_index is not None and first_failed_index > 0:
         classified.loc[first_failed_index, "constraint_status"] = "stress"
+    threshold_lower = (
+        first_safe_before_failure
+        if first_failed_index is not None
+        else safe_capacity
+    )
     return {
         "maximum_safe_ai_capacity_mw": safe_capacity,
         "first_failed_capacity_mw": first_failed,
         "limiting_constraint": limiting,
         "constraint_margin": margin,
-        "threshold_interval_mw": [safe_capacity, first_failed],
+        "threshold_interval_mw": [threshold_lower, first_failed],
+        "feasible_intervals_mw": intervals,
+        "reentrant_feasibility": bool(
+            first_failed_index is not None and any(index > first_failed_index for index in safe_indices)
+        ),
         "capacity_scan": classified,
     }
+
+
+def summarize_constraint_boundaries(
+    capacity_scan: pd.DataFrame,
+    constraints: dict[str, Any],
+) -> pd.DataFrame:
+    """Report the first failing capacity and margin for every CAWCC constraint.
+
+    This table is the bottleneck-migration input: unlike a single limiting
+    constraint it retains constraints that become active later or re-enter
+    feasibility after an intervention.
+    """
+    if capacity_scan.empty or "ai_capacity_mw" not in capacity_scan:
+        raise ValueError("capacity_scan must contain ai_capacity_mw rows")
+    definitions = constraints.get("constraints", constraints)
+    rows: list[dict[str, Any]] = []
+    ordered = capacity_scan.sort_values("ai_capacity_mw").reset_index(drop=True)
+    for metric, definition in definitions.items():
+        operation = definition.get("operator")
+        if operation not in _OPERATORS or metric not in ordered:
+            raise ValueError(f"Invalid carrying-capacity constraint: {metric} {operation}")
+        target = float(definition["value"])
+        passed = ordered[metric].astype(float).map(lambda value: _OPERATORS[operation](value, target))
+        failures = ordered.index[~passed]
+        first = int(failures[0]) if len(failures) else None
+        rows.append({
+            "constraint": metric,
+            "operator": operation,
+            "target": target,
+            "first_failed_capacity_mw": float(ordered.loc[first, "ai_capacity_mw"]) if first is not None else None,
+            "maximum_safe_capacity_mw": float(ordered.loc[passed[passed].index.max(), "ai_capacity_mw"]) if passed.any() else None,
+            "first_failure_margin": (
+                float(ordered.loc[first, metric]) - target
+                if first is not None and operation.startswith("<")
+                else target - float(ordered.loc[first, metric])
+                if first is not None else None
+            ),
+            "reentrant_feasibility": bool(first is not None and passed.iloc[first + 1 :].any()),
+        })
+    return pd.DataFrame(rows).sort_values(
+        ["first_failed_capacity_mw", "constraint"], na_position="last"
+    ).reset_index(drop=True)
+
+
+def _set_path(root: dict[str, Any], path: str, value: Any) -> None:
+    target: Any = root
+    parts = path.split(".")
+    for part in parts[:-1]:
+        target = target[int(part)] if isinstance(target, list) else target[part]
+    if isinstance(target, list):
+        target[int(parts[-1])] = value
+    else:
+        target[parts[-1]] = value
+
+
+def evaluate_ai_interventions(
+    project: dict[str, Any],
+    timeseries: pd.DataFrame,
+    interventions: Iterable[dict[str, Any]],
+    constraints: dict[str, Any],
+    *,
+    capacities_mw: Iterable[float],
+) -> pd.DataFrame:
+    """Re-scan CAWCC after each one-at-a-time capacity intervention."""
+    records: list[dict[str, Any]] = []
+    for intervention in interventions:
+        trial = copy.deepcopy(project)
+        for change in intervention.get("set", []):
+            _set_path(trial, str(change["path"]), change["value"])
+        scan = scan_ai_capacity(trial, timeseries, capacities_mw=capacities_mw)
+        threshold = find_ai_carrying_capacity(scan, constraints)
+        records.append({
+            "intervention": intervention.get("name", "unnamed"),
+            "maximum_safe_ai_capacity_mw": threshold["maximum_safe_ai_capacity_mw"],
+            "first_failed_capacity_mw": threshold["first_failed_capacity_mw"],
+            "limiting_constraint": threshold["limiting_constraint"],
+        })
+    return pd.DataFrame(records)

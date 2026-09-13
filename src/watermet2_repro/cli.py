@@ -15,7 +15,27 @@ from .analysis import (
     pareto_grid_optimize,
 )
 from .full_engine import FullWaterMet2Model, load_project
-from .ai_capacity import find_ai_carrying_capacity, scan_ai_capacity
+from .ai_capacity import (
+    evaluate_ai_interventions,
+    find_ai_carrying_capacity,
+    scan_ai_capacity,
+    summarize_constraint_boundaries,
+)
+from .sensitivity import (
+    capacity_exceedance_probability,
+    morris_sensitivity,
+    probabilistic_ai_capacity_threshold,
+    sobol_sensitivity,
+)
+from .cawcc import build_intraday_profile, intraday_peak_proxy
+from .research import (
+    compare_ai_industrial,
+    dimensionless_margins,
+    hourly_stress_scan,
+    parameter_provenance,
+    robustness_matrix,
+    run_state_pressure_matrix,
+)
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -183,6 +203,136 @@ def command_ai_threshold(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def command_ai_sensitivity(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    specification = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    bounds = {
+        str(path): (float(values[0]), float(values[1]))
+        for path, values in specification["parameters"].items()
+    }
+    metric = str(specification.get("metric", "total_withdrawal_ml"))
+
+    def evaluate(values: dict[str, float]) -> float:
+        trial = json.loads(json.dumps(project))
+        for path, value in values.items():
+            target = trial
+            parts = path.split(".")
+            for part in parts[:-1]:
+                target = target[int(part)] if isinstance(target, list) else target[part]
+            if isinstance(target, list):
+                target[int(parts[-1])] = value
+            else:
+                target[parts[-1]] = value
+        result = FullWaterMet2Model(trial, timeseries).run()
+        from .ai_metrics import summarize_ai_water_kpis
+        return float(summarize_ai_water_kpis(result, trial)[metric])
+
+    method = str(specification.get("method", "morris")).lower()
+    if method == "morris":
+        frame = morris_sensitivity(evaluate, bounds, int(specification.get("trajectories", 20)), int(specification.get("seed", 42)))
+    elif method == "sobol":
+        frame = sobol_sensitivity(evaluate, bounds, int(specification.get("samples", 256)), int(specification.get("seed", 42)))
+    else:
+        raise ValueError("sensitivity method must be morris or sobol")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    print(frame.to_string(index=False))
+
+
+def command_ai_probabilistic_threshold(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    specification = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    frame = probabilistic_ai_capacity_threshold(
+        project, timeseries,
+        {path: (float(values[0]), float(values[1])) for path, values in specification["parameter_ranges"].items()},
+        [float(value) for value in specification["capacities_mw"]],
+        specification["constraints"],
+        samples=int(specification.get("samples", 100)),
+        seed=int(specification.get("seed", 42)),
+    )
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    print(frame.to_string(index=False))
+
+
+def command_ai_exceedance(args: argparse.Namespace) -> None:
+    samples = pd.read_csv(args.samples)
+    probability = capacity_exceedance_probability(samples, args.proposed_mw)
+    print(json.dumps({"proposed_capacity_mw": args.proposed_mw, "exceedance_probability": probability}, ensure_ascii=False, indent=2))
+
+
+def command_ai_bottlenecks(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    specification = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    capacities = specification.get("capacities_mw")
+    scan = scan_ai_capacity(
+        project,
+        timeseries,
+        float(specification.get("min_mw", 0)),
+        float(specification.get("max_mw", 2000)),
+        float(specification.get("step_mw", 25)),
+        capacities_mw=capacities,
+    )
+    boundaries = summarize_constraint_boundaries(scan, specification["constraints"])
+    interventions = evaluate_ai_interventions(
+        project,
+        timeseries,
+        specification.get("interventions", []),
+        specification["constraints"],
+        capacities_mw=capacities or scan["ai_capacity_mw"].tolist(),
+    )
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    boundaries.to_csv(output / "constraint_boundaries.csv", index=False)
+    interventions.to_csv(output / "interventions.csv", index=False)
+    print(boundaries.to_string(index=False))
+
+
+def command_ai_intraday(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    result = FullWaterMet2Model(project, timeseries).run()
+    specification = json.loads(Path(args.spec).read_text(encoding="utf-8")) if args.spec else {}
+    profile = build_intraday_profile(
+        training_fraction=float(specification.get("training_fraction", 0.65)),
+        inference_fraction=float(specification.get("inference_fraction", 0.35)),
+        inference_peak_factor=float(specification.get("inference_peak_factor", 1.35)),
+        peak_hours=specification.get("peak_hours", list(range(10, 18))),
+    )
+    daily = result.data_center_daily.groupby("date", as_index=False).sum(numeric_only=True)
+    hourly = intraday_peak_proxy(daily, profile=profile)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    profile.to_csv(output / "intraday_profile.csv", index=False)
+    hourly.to_csv(output / "ai_hourly_proxy.csv", index=False)
+    print(hourly.head(24).to_string(index=False))
+
+
+def command_ai_research(args: argparse.Namespace) -> None:
+    project, timeseries = load_project(args.project, args.timeseries)
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8")) if args.spec else {}
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    if args.research_command == "states":
+        frame = run_state_pressure_matrix(project, timeseries, spec.get("states", ["S0", "S1", "S2", "S3"]), spec.get("pressures", ["G0", "G1", "G2", "G3"]))
+        frame.to_csv(output / "state_pressure_matrix.csv", index=False)
+    elif args.research_command == "industrial":
+        frame = compare_ai_industrial(project, timeseries, spec.get("mode", "annual_water"))
+        frame.to_csv(output / "industrial_control.csv", index=False)
+    elif args.research_command == "hourly-boundary":
+        frame = hourly_stress_scan(project, timeseries, spec["capacities_mw"], spec["constraints"], profile=build_intraday_profile(**{k: spec[k] for k in ("training_fraction", "inference_fraction", "inference_peak_factor", "peak_hours") if k in spec}), city_phase_hours=int(spec.get("city_phase_hours", 0)))
+        frame.to_csv(output / "hourly_boundary_scan.csv", index=False)
+        dimensionless_margins(frame, spec["constraints"]).to_csv(output / "dimensionless_margins.csv", index=False)
+    elif args.research_command == "robustness":
+        frame = robustness_matrix(project, timeseries, spec["parameter_sets"], spec["capacities_mw"], spec["constraints"])
+        frame.to_csv(output / "robustness.csv", index=False)
+    else:
+        frame = parameter_provenance(project)
+        frame.to_csv(output / "parameter_provenance.csv", index=False)
+    print(frame.to_string(index=False))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="watermet2", description="开放式 WaterMet² 全功能分析引擎")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -258,6 +408,47 @@ def build_parser() -> argparse.ArgumentParser:
     ai_threshold.add_argument("--spec", required=True)
     ai_threshold.add_argument("--output", default="output/ai_threshold")
     ai_threshold.set_defaults(func=command_ai_threshold)
+
+    ai_sensitivity = subparsers.add_parser("ai-sensitivity", help="AI水KPI的Morris/Sobol敏感性")
+    ai_sensitivity.add_argument("project")
+    ai_sensitivity.add_argument("--timeseries")
+    ai_sensitivity.add_argument("--spec", required=True)
+    ai_sensitivity.add_argument("--output", default="output/ai_sensitivity.csv")
+    ai_sensitivity.set_defaults(func=command_ai_sensitivity)
+
+    ai_probabilistic = subparsers.add_parser("ai-probabilistic-threshold", help="概率承载边界")
+    ai_probabilistic.add_argument("project")
+    ai_probabilistic.add_argument("--timeseries")
+    ai_probabilistic.add_argument("--spec", required=True)
+    ai_probabilistic.add_argument("--output", default="output/ai_probabilistic_threshold.csv")
+    ai_probabilistic.set_defaults(func=command_ai_probabilistic_threshold)
+
+    ai_exceedance = subparsers.add_parser("ai-exceedance", help="计算给定AI容量超限概率")
+    ai_exceedance.add_argument("--samples", required=True)
+    ai_exceedance.add_argument("--proposed-mw", type=float, required=True)
+    ai_exceedance.set_defaults(func=command_ai_exceedance)
+
+    ai_bottlenecks = subparsers.add_parser("ai-bottlenecks", help="识别约束瓶颈与干预边际")
+    ai_bottlenecks.add_argument("project")
+    ai_bottlenecks.add_argument("--timeseries")
+    ai_bottlenecks.add_argument("--spec", required=True)
+    ai_bottlenecks.add_argument("--output", default="output/ai_bottlenecks")
+    ai_bottlenecks.set_defaults(func=command_ai_bottlenecks)
+
+    ai_intraday = subparsers.add_parser("ai-intraday", help="生成AI日内负荷与小时水压代理")
+    ai_intraday.add_argument("project")
+    ai_intraday.add_argument("--timeseries")
+    ai_intraday.add_argument("--spec")
+    ai_intraday.add_argument("--output", default="output/ai_intraday")
+    ai_intraday.set_defaults(func=command_ai_intraday)
+
+    for name, help_text in (("states", "运行 S0-S3/G0-G3 状态压力矩阵"), ("industrial", "运行 AI 与普通工业对照"), ("hourly-boundary", "运行小时峰值 CAWCC 代理"), ("robustness", "运行稳健性参数矩阵"), ("provenance", "导出参数证据链")):
+        research_parser = subparsers.add_parser(f"ai-{name}", help=help_text)
+        research_parser.add_argument("project")
+        research_parser.add_argument("--timeseries")
+        research_parser.add_argument("--spec")
+        research_parser.add_argument("--output", default=f"output/ai_{name.replace('-', '_')}")
+        research_parser.set_defaults(func=command_ai_research, research_command=name)
     return parser
 
 

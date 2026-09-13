@@ -1,0 +1,13 @@
+{
+  "parameter_ranges": {
+    "components.AI_DC1.base_pue": [1.1, 1.4],
+    "components.AI_DC1.cooling.cycles_of_concentration": [3, 8]
+  },
+  "capacities_mw": [0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000],
+  "constraints": {
+    "total_withdrawal_ml": {"operator": "<=", "value": 2500},
+    "unmet_cooling_water_ml": {"operator": "<=", "value": 0}
+  },
+  "samples": 100,
+  "seed": 42
+}

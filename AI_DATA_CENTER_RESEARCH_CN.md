@@ -24,9 +24,11 @@ LBNL同时区分现场冷却耗水与发电相关的间接水足迹。本项目�
 | `data/ai_data_center_database.json` | 带来源、年份、单位与不确定性分布的PUE/WUE/CoC/漂水/水质/电网水强度参数先验 |
 | `full_engine.py` | 将AI补水接入真实 potable/reuse 容量与优先级，将blowdown及污染物送入 sewer→WWTW→次日reuse闭环 |
 | `ai_metrics.py` | Withdrawal/Consumption/Return Flow、FDR/RWS/Circularity、最大日/P95/7日/夏季峰值、设施利用率、Baseline差分 |
-| `ai_capacity.py` | 0–2 GW连续扫描、JSON约束判定、最大安全AI容量与限制约束 |
+| `ai_capacity.py` | 0–2 GW连续扫描、JSON约束判定、最大安全AI容量、逐约束边界、瓶颈迁移与一阶干预扫描 |
 | `ai_scenarios.py` | 容量×冷却×水源×水文气候×基础设施矩阵、hot+drought、离散Pareto策略 |
 | `sensitivity.py` | Morris、Sobol、Monte Carlo概率承载边界和指定容量超限概率 |
+| `cawcc.py` | 开题报告 S0–S3/G0–G3 场景标签、Table-1约束生成、训练/推理日内负荷与小时峰值代理 |
+| `research.py` | S/G状态压力矩阵、AI/工业对照、小时边界代理、无量纲裕度、稳健性矩阵与参数证据链 |
 | CLI/API/Toolkit | 批量运行、自动化、Studio调用及结果导出 |
 | Studio | AI节点参数编辑、AI Water KPI及日序列展示 |
 
@@ -58,6 +60,11 @@ python -m watermet2_repro.cli validate examples\ai_data_center\project.json
 python -m watermet2_repro.cli run examples\ai_data_center\project.json --output output\ai_city
 python -m watermet2_repro.cli ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100 --output output\ai_capacity_scan.csv
 python -m watermet2_repro.cli ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json --output output\ai_threshold
+python -m watermet2_repro.cli ai-bottlenecks examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json --output output\ai_bottlenecks
+python -m watermet2_repro.cli ai-intraday examples\ai_data_center\project.json --output output\ai_intraday
+python -m watermet2_repro.cli ai-states examples\ai_data_center\project.json --output output\ai_states
+python -m watermet2_repro.cli ai-industrial examples\ai_data_center\project.json --output output\ai_industrial
+python -m watermet2_repro.cli ai-provenance examples\ai_data_center\project.json --output output\ai_provenance
 ```
 
 主要产物：
@@ -66,6 +73,12 @@ python -m watermet2_repro.cli ai-threshold examples\ai_data_center\project.json 
 - `ai_capacity_scan.csv`
 - `ai_capacity_threshold.csv/json`
 - `pollutant_daily.csv` 中的 AI blowdown 和下游 WWTW 负荷
+- `constraint_boundaries.csv`：WTW、WWTW、回用、供水可靠性以及可选本地接入/电网接入的首个失效点
+- `interventions.csv`：单因素扩容、回用或接入能力干预后的承载边际
+- `ai_hourly_proxy.csv`：由日尺度结果按训练/推理 profile 展开的守恒小时代理；用于极端峰值敏感性，不替代小时遥测或水力模型
+- `state_pressure_matrix.csv`：S0–S3 × G0–G3 条件化响应矩阵
+- `industrial_control.csv`：AI 与等效普通工业控制对照
+- `parameter_provenance.csv`：参数来源、单位、年份、证据类型和不确定性
 
 Python接口：
 

@@ -137,24 +137,34 @@ def _aggregate_frame(
     working["date"] = pd.to_datetime(working["date"])
     numeric = working.select_dtypes(include=[np.number]).columns.tolist()
     state_columns = [
-        column for column in ("storage_ml", "population")
-        if column in numeric
+        column for column in (
+            "storage_ml", "storage_end_ml", "population", "installed_it_capacity_mw",
+        ) if column in numeric
     ]
-    ratio_columns = [
-        column
-        for column in (
-            "delivered_percent",
-            "water_quality_index",
-            "tap_water_quality_index",
-        )
-        if column in numeric
-    ]
-    sum_columns = [
+    average_columns = [
         column for column in numeric
-        if column not in state_columns + ratio_columns
+        if column not in state_columns and (
+            column.endswith("_fraction")
+            or column.endswith("_ratio")
+            or column.endswith("_index")
+            or column in {
+                "delivered_percent", "pue", "wue_l_kwh", "cycles_of_concentration",
+                "it_load_mw",
+                "wet_bulb_temperature_c", "actual_reclaimed_fraction",
+                "load_factor", "quality_coc_fallback", "weather_fallback",
+            }
+        )
     ]
+    sum_columns = [column for column in numeric if column not in state_columns + average_columns]
     groupers: list[Any] = [pd.Grouper(key="date", freq=frequency), *identifiers]
     aggregated = working.groupby(groupers, dropna=False)[sum_columns].sum().reset_index()
+    if average_columns:
+        averages = (
+            working.groupby(groupers, dropna=False)[average_columns]
+            .mean(numeric_only=True)
+            .reset_index()
+        )
+        aggregated = aggregated.merge(averages, on=["date", *identifiers], how="left")
     if state_columns:
         states = (
             working.groupby(groupers, dropna=False)[state_columns]

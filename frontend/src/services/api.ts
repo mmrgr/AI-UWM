@@ -96,6 +96,100 @@ export async function runOptimization(
   });
 }
 
+export async function runAiBaseline(payload: ProjectPayload): Promise<{
+  comparison: Record<string, unknown>[];
+}> {
+  return requestJson('/api/ai/baseline', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runAiSensitivity(
+  payload: ProjectPayload & { specification: Record<string, unknown> },
+): Promise<{ method: string; metric: string; sensitivity: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/sensitivity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runAiProbabilisticThreshold(
+  payload: ProjectPayload & { specification: Record<string, unknown> },
+): Promise<{ threshold_samples: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/probabilistic-threshold', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runAiExceedanceProbability(
+  payload: ProjectPayload & { specification: Record<string, unknown> },
+): Promise<{ proposed_capacity_mw: number; exceedance_probability: number }> {
+  return requestJson('/api/ai/exceedance-probability', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runAiBottlenecks(
+  payload: ProjectPayload & { specification: Record<string, unknown> },
+): Promise<{
+  constraint_boundaries: Record<string, unknown>[];
+  interventions: Record<string, unknown>[];
+}> {
+  return requestJson('/api/ai/bottlenecks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runAiIntradayProxy(
+  payload: ProjectPayload & { specification?: Record<string, unknown> },
+): Promise<{
+  profile: Record<string, unknown>[];
+  hourly: Record<string, unknown>[];
+}> {
+  return requestJson('/api/ai/intraday-proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function runAiHourlyBoundary(
+  payload: ProjectPayload & { specification: Record<string, unknown> },
+): Promise<{ scan: Record<string, unknown>[]; margins: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/hourly-boundary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+export async function runAiStates(
+  payload: ProjectPayload & { specification?: Record<string, unknown> },
+): Promise<{ scenarios: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/states', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+export async function runAiIndustrialControl(
+  payload: ProjectPayload & { specification?: Record<string, unknown> },
+): Promise<{ comparison: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/industrial-control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+export async function runAiRobustness(
+  payload: ProjectPayload & { specification: Record<string, unknown> },
+): Promise<{ samples: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/robustness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
+export async function runAiProvenance(payload: ProjectPayload): Promise<{ parameters: Record<string, unknown>[] }> {
+  return requestJson('/api/ai/provenance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
 export async function exportSimulation(payload: ProjectPayload): Promise<Blob> {
   const response = await fetch('/api/export', {
     method: 'POST',

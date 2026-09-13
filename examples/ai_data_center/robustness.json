@@ -1,0 +1,12 @@
+{
+  "capacities_mw": [0, 500, 1000, 1500, 2000],
+  "parameter_sets": [
+    {"components.AI_DC1.load_factor": 0.65},
+    {"components.AI_DC1.load_factor": 0.75},
+    {"components.AI_DC1.load_factor": 0.85}
+  ],
+  "constraints": {
+    "system_reliability_fraction": {"operator": ">=", "value": 0.99},
+    "domestic_unmet_ml": {"operator": "<=", "value": 0}
+  }
+}

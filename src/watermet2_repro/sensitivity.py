@@ -19,6 +19,8 @@ def morris_sensitivity(
     """Compute Morris elementary-effect μ, μ* and σ without external dependencies."""
     if trajectories < 2:
         raise ValueError("Morris analysis requires at least two trajectories")
+    if not bounds or any(low > high for low, high in bounds.values()):
+        raise ValueError("Sensitivity bounds require low <= high")
     rng = np.random.default_rng(seed)
     effects = {name: [] for name in bounds}
     for _ in range(trajectories):
@@ -48,6 +50,8 @@ def sobol_sensitivity(
     """Estimate first-order and total-order Sobol indices with Saltelli matrices."""
     if samples < 16:
         raise ValueError("Sobol analysis requires at least 16 base samples")
+    if not bounds or any(low > high for low, high in bounds.values()):
+        raise ValueError("Sensitivity bounds require low <= high")
     names = list(bounds)
     rng = np.random.default_rng(seed)
     a = rng.random((samples, len(names)))
@@ -90,6 +94,12 @@ def probabilistic_ai_capacity_threshold(
     samples: int = 100,
     seed: int = 42,
 ) -> pd.DataFrame:
+    if samples < 1:
+        raise ValueError("samples must be positive")
+    if not capacities_mw:
+        raise ValueError("capacities_mw must not be empty")
+    if any(low > high for low, high in parameter_ranges.values()):
+        raise ValueError("parameter ranges require low <= high")
     rng = np.random.default_rng(seed)
     rows = []
     for sample_id in range(samples):
@@ -108,7 +118,14 @@ def probabilistic_ai_capacity_threshold(
 def capacity_exceedance_probability(
     threshold_samples: pd.DataFrame, proposed_capacity_mw: float
 ) -> float:
+    if "maximum_safe_ai_capacity_mw" not in threshold_samples:
+        raise KeyError("threshold_samples must contain maximum_safe_ai_capacity_mw")
+    proposed = float(proposed_capacity_mw)
+    if not np.isfinite(proposed):
+        raise ValueError("proposed_capacity_mw must be finite")
     thresholds = pd.to_numeric(
         threshold_samples["maximum_safe_ai_capacity_mw"], errors="coerce"
-    )
-    return float((thresholds < proposed_capacity_mw).mean())
+    ).dropna()
+    if thresholds.empty:
+        return float("nan")
+    return float((thresholds < proposed).mean())

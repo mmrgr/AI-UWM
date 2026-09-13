@@ -48,6 +48,7 @@ def summarize_ai_water_kpis(
                 "external_withdrawal_ml", "potable_water_ml", "reclaimed_water_ml",
                 "consumption_ml", "return_flow_ml", "unmet_cooling_water_ml",
                 "it_energy_mwh", "facility_energy_mwh", "offsite_electricity_water_ml",
+                "internal_recovery_ml", "gross_makeup_ml",
             )},
             index=result.system_daily.index,
         )
@@ -77,6 +78,33 @@ def summarize_ai_water_kpis(
     max_system_demand = float(system["water_demand_ml"].max())
     dc_peak_date = pd.Timestamp(daily.loc[daily["external_withdrawal_ml"].idxmax(), "date"])
     city_peak_date = pd.Timestamp(system.loc[system["water_demand_ml"].idxmax(), "date"])
+    local_connection_ratios: list[float] = []
+    grid_connection_ratios: list[float] = []
+    if project and not result.data_center_daily.empty:
+        for component_id, component in project.get("components", {}).items():
+            if component.get("kind") != "data_center":
+                continue
+            rows = result.data_center_daily[
+                result.data_center_daily["data_center_id"] == component_id
+            ]
+            if rows.empty:
+                continue
+            local_capacity = component.get("local_connection_capacity_ml_day")
+            if local_capacity is not None and float(local_capacity) > 0:
+                area_rows = result.area_daily[
+                    result.area_daily["area_id"] == component.get("local_area")
+                ]
+                demand_column = f"demand_data_center::{component_id}_ml"
+                if demand_column in area_rows:
+                    local_connection_ratios.append(
+                        float(area_rows[demand_column].max()) / float(local_capacity)
+                    )
+            grid_capacity = component.get("grid_connection_capacity_mw")
+            if grid_capacity is not None and float(grid_capacity) > 0:
+                grid_connection_ratios.append(
+                    float((rows["facility_energy_mwh"] / 24.0).max())
+                    / float(grid_capacity)
+                )
     values = {
         "total_withdrawal_ml": withdrawal,
         "freshwater_withdrawal_ml": potable,
@@ -106,6 +134,12 @@ def summarize_ai_water_kpis(
         "it_energy_mwh": float(daily["it_energy_mwh"].sum()),
         "facility_energy_mwh": float(daily["facility_energy_mwh"].sum()),
         "offsite_electricity_water_ml": float(daily["offsite_electricity_water_ml"].sum()),
+        "max_local_connection_ratio": max(local_connection_ratios) if local_connection_ratios else float("nan"),
+        "max_daily_average_grid_connection_ratio": max(grid_connection_ratios) if grid_connection_ratios else float("nan"),
+        "internal_cooling_recovery_ratio": _safe_ratio(
+            float(daily["internal_recovery_ml"].sum()),
+            float(daily["gross_makeup_ml"].sum()),
+        ),
     }
     return values
 

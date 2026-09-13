@@ -146,20 +146,39 @@ def validate_project(project: dict[str, Any], timeseries: pd.DataFrame) -> None:
                 errors.append(
                     f"数据中心 {component_id} 引用了不存在的 local_area={component.get('local_area')}"
                 )
-            if float(component.get("installed_it_capacity_mw", 0.0)) < 0:
-                errors.append(f"数据中心 {component_id}.installed_it_capacity_mw 不能为负")
+            try:
+                installed_capacity = float(component.get("installed_it_capacity_mw", 0.0))
+            except (TypeError, ValueError):
+                installed_capacity = -1.0
+            if installed_capacity < 0:
+                errors.append(f"数据中心 {component_id}.installed_it_capacity_mw 必须为非负数")
+            schedule_dates: list[pd.Timestamp] = []
             for entry in component.get("capacity_schedule", []):
                 try:
-                    pd.Timestamp(entry["date"])
-                    if float(entry["capacity_mw"]) < 0:
+                    schedule_date = pd.Timestamp(entry["date"])
+                    schedule_dates.append(schedule_date)
+                    capacity = float(entry["capacity_mw"])
+                    if capacity < 0:
                         errors.append(f"数据中心 {component_id}.capacity_schedule 容量不能为负")
                 except (KeyError, TypeError, ValueError):
                     errors.append(f"数据中心 {component_id}.capacity_schedule 格式无效")
+            if schedule_dates and schedule_dates != sorted(schedule_dates):
+                errors.append(f"数据中心 {component_id}.capacity_schedule 必须按日期升序")
+            if len(schedule_dates) != len(set(schedule_dates)):
+                errors.append(f"数据中心 {component_id}.capacity_schedule 日期不能重复")
             load = component.get("load", {})
-            if not 0 <= float(component.get("load_factor", load.get("factor", 0.0))) <= 1:
+            try:
+                load_factor = float(component.get("load_factor", load.get("factor", 0.0)))
+            except (TypeError, ValueError):
+                load_factor = -1.0
+            if not 0 <= load_factor <= 1:
                 errors.append(f"数据中心 {component_id}.load_factor 必须位于 [0,1]")
             cooling = component.get("cooling", {})
-            if float(component.get("base_pue", component.get("pue", 1.2))) < 1:
+            try:
+                base_pue = float(component.get("base_pue", component.get("pue", 1.2)))
+            except (TypeError, ValueError):
+                base_pue = 0.0
+            if base_pue < 1:
                 errors.append(f"数据中心 {component_id}.base_pue 不能小于 1")
             storage_capacity = float(component.get("cooling_storage_capacity_ml", component.get("cooling_storage_ml", 0.0)))
             storage_initial = float(component.get("initial_cooling_storage_ml", 0.0))
@@ -170,7 +189,11 @@ def validate_project(project: dict[str, Any], timeseries: pd.DataFrame) -> None:
                 "liquid_to_air", "liquid_to_water", "liquid_air", "liquid_water",
             }:
                 errors.append(f"数据中心 {component_id}.cooling.technology 无效")
-            if float(cooling.get("cycles_of_concentration", 5.0)) <= 1:
+            try:
+                cycles = float(cooling.get("cycles_of_concentration", 5.0))
+            except (TypeError, ValueError):
+                cycles = 0.0
+            if cycles <= 1:
                 errors.append(f"数据中心 {component_id} 浓缩倍数必须大于 1")
             if cooling.get("coc_mode", "fixed") not in {"fixed", "quality_limited"}:
                 errors.append(f"数据中心 {component_id}.cooling.coc_mode 无效")
@@ -179,14 +202,28 @@ def validate_project(project: dict[str, Any], timeseries: pd.DataFrame) -> None:
                     errors.append(f"数据中心 {component_id}.cooling.{field} 必须位于 [0,1]")
             if any(float(value) <= 0 for value in cooling.get("water_quality_limits", {}).values()):
                 errors.append(f"数据中心 {component_id}.cooling.water_quality_limits 必须为正")
-            source_total = sum(
-                float(source.get("target_fraction", 0.0))
-                for source in component.get("water_sources", {}).values()
-            )
+            source_values: list[float] = []
+            for source in component.get("water_sources", {}).values():
+                try:
+                    fraction = float(source.get("target_fraction", 0.0))
+                except (TypeError, ValueError):
+                    fraction = -1.0
+                source_values.append(fraction)
+                if not 0 <= fraction <= 1:
+                    errors.append(f"数据中心 {component_id}.water_sources.target_fraction 必须位于 [0,1]")
+            source_total = sum(source_values)
             if component.get("water_sources") and abs(source_total - 1.0) > 1e-6:
                 errors.append(
                     f"数据中心 {component_id}.water_sources.target_fraction 合计应为 1"
                 )
+            for field in ("local_connection_capacity_ml_day", "grid_connection_capacity_mw"):
+                if field in component:
+                    try:
+                        value = float(component[field])
+                    except (TypeError, ValueError):
+                        value = -1.0
+                    if value < 0:
+                        errors.append(f"数据中心 {component_id}.{field} 必须为非负数")
             for source in component.get("water_sources", {}).values():
                 for key in ("available_ml_day", "constant_available_ml_day"):
                     if key in source and float(source[key]) < 0:

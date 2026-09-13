@@ -1,0 +1,11 @@
+{
+  "method": "morris",
+  "metric": "total_withdrawal_ml",
+  "trajectories": 20,
+  "seed": 42,
+  "parameters": {
+    "components.AI_DC1.base_pue": [1.1, 1.4],
+    "components.AI_DC1.cooling.cycles_of_concentration": [3, 8],
+    "components.AI_DC1.load_factor": [0.6, 0.9]
+  }
+}
