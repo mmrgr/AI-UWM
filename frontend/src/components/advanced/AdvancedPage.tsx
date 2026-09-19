@@ -141,7 +141,7 @@ export function AdvancedPage() {
         <div>
           <span className="eyebrow">ADVANCED ANALYSIS</span>
           <h1>高级分析与决策支持</h1>
-          <p>四类分析均直接调用 WaterMet² 计算引擎，并返回可检查的逐试验结果。</p>
+          <p>四类分析均直接调用 AI-UWM 计算引擎，并返回可检查的逐试验结果。</p>
         </div>
       </div>
       <div className="feature-grid advanced-mode-grid">

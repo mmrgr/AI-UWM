@@ -10,23 +10,23 @@ import { temporal } from 'zundo';
 import { create } from 'zustand';
 import { defaultProject, defaultTimeseries } from '../data/defaultProject';
 import { graphToProject, projectToGraph } from '../engine/adapters/projectAdapter';
-import type { StudioEdge, StudioNode, WaterMetEdgeData } from '../types/nodes';
-import type { TimeSeriesRow, WaterMetProject } from '../types/project';
+import type { StudioEdge, StudioNode, UWMEdgeData } from '../types/nodes';
+import type { TimeSeriesRow, UWMProject } from '../types/project';
 import type { SimulationResponse } from '../types/results';
 import { useResultStore } from './useResultStore';
 
 interface ProjectState {
-  project: WaterMetProject;
+  project: UWMProject;
   timeseries: TimeSeriesRow[];
   nodes: StudioNode[];
   edges: StudioEdge[];
   dirty: boolean;
-  loadProject: (project: WaterMetProject, timeseries: TimeSeriesRow[]) => void;
+  loadProject: (project: UWMProject, timeseries: TimeSeriesRow[]) => void;
   setTimeseries: (rows: TimeSeriesRow[]) => void;
   setSimulationDates: (start: string, end: string) => void;
   onNodesChange: (changes: NodeChange<StudioNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<StudioEdge>[]) => void;
-  connect: (connection: Connection, data: WaterMetEdgeData) => void;
+  connect: (connection: Connection, data: UWMEdgeData) => void;
   addNode: (node: StudioNode) => void;
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
   updateNodeLabel: (id: string, label: string) => void;
@@ -34,7 +34,7 @@ interface ProjectState {
   normalizeOutgoing: (source: string) => void;
   applySimulationFlows: (result: SimulationResponse) => void;
   markSaved: () => void;
-  syncProject: () => WaterMetProject;
+  syncProject: () => UWMProject;
 }
 
 const initialGraph = projectToGraph(defaultProject);
@@ -111,7 +111,7 @@ export const useProjectStore = create<ProjectState>()(
             {
               ...connection,
               id: `e-${connection.source}-${connection.target}-${Date.now()}`,
-              type: 'watermet',
+              type: 'aiuwm',
               animated: true,
               data,
             },

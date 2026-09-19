@@ -1,8 +1,8 @@
-# WaterMet² Studio 中文使用教程
+# AI-UWM Studio 中文使用教程
 
 这份说明面向“手里只有业务数据、没有编程经验”的用户。照着第 1～8 步操作，即可完成数据准备、模型配置、检查、运行和结果导出。
 
-WaterMet² 是日尺度城市水系统战略模型，不是管网压力模型。它回答的是：
+本框架是日尺度城市水系统战略模型，不是管网压力模型。它回答的是：
 
 - 城市每天需要多少水，能够供应多少，缺水多少；
 - 水源、给水厂、管网、用户、排水、污水厂和回用系统之间有多少水流；
@@ -28,7 +28,7 @@ WaterMet² 是日尺度城市水系统战略模型，不是管网压力模型。
 - Python 3.10 或更高版本；
 - Node.js 20 或更高版本。
 
-在项目目录 `D:\研二上\我的论文\watermet2` 打开 PowerShell：
+在项目目录 `D:\研二上\我的论文\aiuwm` 打开 PowerShell：
 
 ```powershell
 python -m pip install -e ".[studio,test]"
@@ -40,22 +40,22 @@ npm install
 
 打开两个 PowerShell 窗口。
 
-窗口一，在项目根目录启动 WaterMet² 模型 API：
+窗口一，在项目根目录启动 AI-UWM 模型 API：
 
 ```powershell
-watermet2-api
+aiuwm-api
 ```
 
-如果提示找不到 `watermet2-api`，使用：
+如果提示找不到 `aiuwm-api`，使用：
 
 ```powershell
-python -m uvicorn watermet2_repro.api:app --host 127.0.0.1 --port 8000
+python -m uvicorn aiuwm.api:app --host 127.0.0.1 --port 8000
 ```
 
 窗口二启动网页：
 
 ```powershell
-Set-Location "D:\研二上\我的论文\watermet2\frontend"
+Set-Location "D:\研二上\我的论文\aiuwm\frontend"
 npm run dev
 ```
 
@@ -70,7 +70,7 @@ npm run dev
 建议新建一个独立目录：
 
 ```text
-my_watermet_case/
+my_uwm_case/
 ├─ project.json
 ├─ timeseries.csv
 ├─ 数据来源说明.txt
@@ -326,5 +326,5 @@ python scripts\run_full_validation.py
 如果页面提示 API 未连接，先访问 <http://127.0.0.1:8000/api/health>。正常应返回：
 
 ```json
-{"status":"ok","engine":"watermet2-reproduction"}
+{"status":"ok","engine":"aiuwm"}
 ```

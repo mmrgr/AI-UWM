@@ -4,8 +4,8 @@ import copy
 from pathlib import Path
 import pandas as pd
 
-from watermet2_repro.ai_capacity import find_ai_carrying_capacity, scan_ai_capacity
-from watermet2_repro.full_engine import load_project
+from aiuwm.ai_capacity import find_ai_carrying_capacity, scan_ai_capacity
+from aiuwm.full_engine import load_project
 
 
 def project_with_ai():

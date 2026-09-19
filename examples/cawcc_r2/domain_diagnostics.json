@@ -1,0 +1,28 @@
+[
+  {
+    "domain": "ha",
+    "label": "D-HA 缺水—高冷负荷端",
+    "days": 730,
+    "t_mean": 13.52,
+    "t_max": 35.93,
+    "t_min": -8.86,
+    "twb_summer_mean": 22.8,
+    "twb_max": 28.23,
+    "free_cooling_hours_equiv_days_twb_lt_10": 382,
+    "rain_annual_mm": 550.0,
+    "inflow_mean_ml": 263.7
+  },
+  {
+    "domain": "co",
+    "label": "D-CO 气候凉爽端",
+    "days": 730,
+    "t_mean": 9.04,
+    "t_max": 29.05,
+    "t_min": -9.24,
+    "twb_summer_mean": 15.44,
+    "twb_max": 23.06,
+    "free_cooling_hours_equiv_days_twb_lt_10": 485,
+    "rain_annual_mm": 780.0,
+    "inflow_mean_ml": 292.9
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "method": "morris",
+  "metric": "total_withdrawal_ml",
+  "trajectories": 24,
+  "seed": 20260918,
+  "parameters": {
+    "components.AI_DC1.base_pue": [
+      1.12,
+      1.36
+    ],
+    "components.AI_DC1.temperature_coefficient": [
+      0.0005,
+      0.008
+    ],
+    "components.AI_DC1.cooling.cycles_of_concentration": [
+      3.0,
+      9.0
+    ],
+    "components.AI_DC1.cooling.drift_fraction": [
+      5e-05,
+      0.0005
+    ],
+    "components.AI_DC1.cooling.internal_recovery_fraction": [
+      0.0,
+      0.3
+    ],
+    "components.AI_DC1.cooling.heat_to_cooling_fraction": [
+      0.85,
+      1.0
+    ]
+  }
+}

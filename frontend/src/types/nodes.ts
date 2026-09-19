@@ -24,7 +24,7 @@ export type WaterFlowType =
 
 export type ValidationStatus = 'valid' | 'warning' | 'error' | 'unconfigured';
 
-export interface WaterMetNodeData extends Record<string, unknown> {
+export interface UWMNodeData extends Record<string, unknown> {
   label: string;
   nodeType: ComponentKind;
   config: ProjectObject;
@@ -33,7 +33,7 @@ export interface WaterMetNodeData extends Record<string, unknown> {
   warningCount: number;
 }
 
-export interface WaterMetEdgeData extends Record<string, unknown> {
+export interface UWMEdgeData extends Record<string, unknown> {
   flowType: WaterFlowType;
   allocation: number;
   flowMlDay?: number;
@@ -41,8 +41,8 @@ export interface WaterMetEdgeData extends Record<string, unknown> {
   label?: string;
 }
 
-export type StudioNode = Node<WaterMetNodeData, 'watermet'>;
-export type StudioEdge = Edge<WaterMetEdgeData, 'watermet'>;
+export type StudioNode = Node<UWMNodeData, 'aiuwm'>;
+export type StudioEdge = Edge<UWMEdgeData, 'aiuwm'>;
 
 export interface PaletteItem {
   nodeType: ComponentKind;

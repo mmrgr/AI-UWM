@@ -6,12 +6,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from watermet2_repro.analysis import (
+from aiuwm.analysis import (
     analytic_hierarchy_rank,
     analytic_hierarchy_weights,
     evaluate_decision_problem,
 )
-from watermet2_repro.full_engine import FullWaterMet2Model, load_project
+from aiuwm.full_engine import FullAIUWMModel, load_project
 
 
 PROJECT = Path("examples/demo_full/project.json")
@@ -36,7 +36,7 @@ def test_risk_thresholds_use_tolerance_and_unconfigured_status() -> None:
             "normalization_scale": 1.0,
         }
     }
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
 
     shortage = result.risk_daily[result.risk_daily.risk_code == "R01HZ04"]
     assert shortage["assessed"].all()

@@ -1,28 +1,34 @@
-# WaterMet² 开放复现与城市水系统分析框架
+# AI-UWM：面向 AI 算力影响研究的城市水系统代谢与承载力分析框架
 
-这是依据 Behzadian 与 Kapelan（2015）论文、TRUST D33.2 官方手册和 Oslo 案例报告重写的 Python 实现。它覆盖公开文献描述的 WaterMet² 分析链：日尺度水量与污染物质量守恒、四级空间表达、供水—用水—雨洪—污水—回用、能源/材料/化学品、环境影响、成本、资源回收、干预方案、校准、不确定性、CP/AHP 多准则排序和场景决策支持。
+本项目是一套**独立编写**的城市水系统日尺度代谢模拟与承载力分析框架（Python 引擎 + Web Studio），核心用途是评估 **AI 数据中心进入城市之后**的取水—给水—排水—再生水回路响应、多时间尺度承载边界（CAWCC）以及水—能耦合瓶颈迁移。能力覆盖日尺度水量与污染物质量守恒、四级空间表达、供水—用水—雨洪—污水—回用、能源/材料/化学品、环境影响、成本、资源回收、干预方案、校准、不确定性、CP/AHP 多准则排序和场景决策支持。
 
-原始 WaterMet² 是闭源 C# 软件，论文使用的 Oslo SCADA 日序列也未公开，因此本项目不能声称与原二进制逐行或逐日数值完全相同；但公开方法和功能都已有可审计实现。完整对照见 [FUNCTIONAL_COVERAGE_CN.md](FUNCTIONAL_COVERAGE_CN.md)，论文案例复现边界见 [REPRODUCTION_REPORT_CN.md](REPRODUCTION_REPORT_CN.md)。
+公开文献所述方法的参考实现是闭源 C# 软件，论文使用的 Oslo SCADA 日序列也未公开，因此本项目不声称与任何闭源二进制逐行或逐日数值等价；但公开方法涉及的功能均有可审计实现。功能覆盖对照见 [FUNCTIONAL_COVERAGE_CN.md](FUNCTIONAL_COVERAGE_CN.md)，案例复现边界见 [REPRODUCTION_REPORT_CN.md](REPRODUCTION_REPORT_CN.md)。
+
+## 方法学来源与合规声明
+
+本框架的**方法学思路**参考了公开发表的城市水系统定量绩效模型文献与公开项目文档，**全部为独立编码实现**：不含任何第三方源代码、二进制组件或私有工程文件格式，也未使用任何受商标保护的产品名称作为本项目的包名、命令名或产品名。
+
+| 来源 | 标识 |
+|---|---|
+| 城市水代谢与战略规划论文（Behzadian & Kapelan, 2015） | DOI: <https://doi.org/10.1016/j.resconrec.2015.03.015> |
+| 城市水系统定量绩效模型论文（Behzadian 等, 2014） | DOI: <https://doi.org/10.5194/dwes-7-63-2014> |
+| 城市新陈代谢长期规划决策支持系统论文（Morley 等, 2015） | DOI: <https://doi.org/10.2166/ws.2015.167> |
+| Exeter 官方仓储的功能需求文档 | <https://ore.exeter.ac.uk/repository/handle/10871/17302> |
+
+`references/` 仅发布来源元数据；论文和报告 PDF 因版权原因不随公开仓库上传，可从上述官方地址下载。
 
 ## Windows 一键打开
 
 日常使用只需双击项目根目录中的：
 
 ```text
-启动WaterMet2 Studio.cmd
+启动 AI-UWM Studio.cmd
 ```
 
 程序会自动检查依赖、构建网页、启动模型服务并打开
 <http://127.0.0.1:8000>。现在前端和 API 由同一个 Python 进程提供，不再需要手动启动两个终端。
 
 第一次启动可能需要几分钟安装依赖；以后通常会直接打开。关闭启动程序窗口即可停止系统。目录用途见 [项目文件说明.md](项目文件说明.md)，自有数据操作教程见 [frontend/README.md](frontend/README.md)。
-
-主要公开依据：
-
-- 2015 论文 DOI：<https://doi.org/10.1016/j.resconrec.2015.03.015>
-- 2014 开放论文与模型概述：<https://doi.org/10.5194/dwes-7-63-2014>
-- Exeter 官方仓储的功能需求：<https://ore.exeter.ac.uk/repository/handle/10871/17302>
-- `references/` 仅发布来源元数据；论文和报告 PDF 因版权原因不随公开仓库上传，可从上述官方地址下载。
 
 ## 1. 安装与验证
 
@@ -33,15 +39,15 @@ python -m pip install -e ".[test]"
 python -m pytest -q
 ```
 
-当前验证结果为 `49 passed`。安装后可使用 `watermet2` 命令；若环境没有刷新命令入口，可用 `python -m watermet2_repro.cli` 替代。
+当前验证结果为 `58 passed`（其中 Studio 静态资源一项需要前端 `dist/` 已构建）。安装后可使用 `aiuwm` 命令；若环境没有刷新命令入口，可用 `python -m aiuwm.cli` 替代。
 
 ### 可视化前端
 
-项目包含 React + TypeScript 的 WaterMet² Studio，可编辑系统拓扑、导入 CSV、执行前后端校验、运行同一套 Python 模型，并查看 KPI、桑基图、时间序列、风险和情景对比。
+项目包含 React + TypeScript 的 AI-UWM Studio，可编辑系统拓扑、导入 CSV、执行前后端校验、运行同一套 Python 模型，并查看 KPI、桑基图、时间序列、风险和情景对比。
 
 ```powershell
 python -m pip install -e ".[studio,test]"
-watermet2-api
+aiuwm-api
 ```
 
 另开一个 PowerShell：
@@ -66,8 +72,8 @@ python scripts\run_full_validation.py
 ## 2. 先运行完整示例
 
 ```powershell
-watermet2 validate examples\demo_full\project.json
-watermet2 run examples\demo_full\project.json --output output\demo
+aiuwm validate examples\demo_full\project.json
+aiuwm run examples\demo_full\project.json --output output\demo
 ```
 
 完整示例包含两套水源—WTW—水池—配水链、室内/工业/季节需求、RWH、GWR、中心回用、混合排水、两座 WWTW、受纳水体、BOD/TSS/TN/TP、污泥与资源回收、管道更新和分期干预。
@@ -78,19 +84,19 @@ watermet2 run examples\demo_full\project.json --output output\demo
 研究参数先验位于 `data/ai_data_center_database.json`；示例通过 `ai_database_file` 引用，项目内显式参数始终优先。
 
 ```powershell
-watermet2 run examples\ai_data_center\project.json --output output\ai_city
-watermet2 ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100
-watermet2 ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
-watermet2 ai-sensitivity examples\ai_data_center\project.json --spec examples\ai_data_center\sensitivity.json
-watermet2 ai-probabilistic-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\probabilistic_threshold.json
-watermet2 ai-exceedance --samples output\ai_probabilistic_threshold.csv --proposed-mw 1000
-watermet2 ai-bottlenecks examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
-watermet2 ai-intraday examples\ai_data_center\project.json --output output\ai_intraday
-watermet2 ai-states examples\ai_data_center\project.json --output output\ai_states
-watermet2 ai-industrial examples\ai_data_center\project.json --output output\ai_industrial
-watermet2 ai-hourly-boundary examples\ai_data_center\project.json --spec examples\ai_data_center\hourly_boundary.json --output output\ai_hourly_boundary
-watermet2 ai-robustness examples\ai_data_center\project.json --spec examples\ai_data_center\robustness.json --output output\ai_robustness
-watermet2 ai-provenance examples\ai_data_center\project.json --output output\ai_provenance
+aiuwm run examples\ai_data_center\project.json --output output\ai_city
+aiuwm ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100
+aiuwm ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
+aiuwm ai-sensitivity examples\ai_data_center\project.json --spec examples\ai_data_center\sensitivity.json
+aiuwm ai-probabilistic-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\probabilistic_threshold.json
+aiuwm ai-exceedance --samples output\ai_probabilistic_threshold.csv --proposed-mw 1000
+aiuwm ai-bottlenecks examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json
+aiuwm ai-intraday examples\ai_data_center\project.json --output output\ai_intraday
+aiuwm ai-states examples\ai_data_center\project.json --output output\ai_states
+aiuwm ai-industrial examples\ai_data_center\project.json --output output\ai_industrial
+aiuwm ai-hourly-boundary examples\ai_data_center\project.json --spec examples\ai_data_center\hourly_boundary.json --output output\ai_hourly_boundary
+aiuwm ai-robustness examples\ai_data_center\project.json --spec examples\ai_data_center\robustness.json --output output\ai_robustness
+aiuwm ai-provenance examples\ai_data_center\project.json --output output\ai_provenance
 ```
 
 Studio API 还提供 `/api/ai/baseline`、`/api/ai/sensitivity`、
@@ -115,13 +121,13 @@ python scripts\run_reproduction.py
 
 - `examples/demo_full/project.json`：系统结构、参数和方案；
 - `examples/demo_full/timeseries.csv`：每日外部驱动数据；
-- `data/watermet2_database.json`：官方附录的能源、材料、化学品和修复系数。
+- `data/uwm_database.json`：`references/` 所列来源文献附录给出的能源、材料、化学品和修复系数默认值。
 
 在新 `project.json` 中保留：
 
 ```json
 {
-  "database_file": "../../data/watermet2_database.json",
+  "database_file": "../../data/uwm_database.json",
   "timeseries_file": "timeseries.csv",
   "simulation": {"start": "2020-01-01", "end": "2024-12-31"}
 }
@@ -267,8 +273,8 @@ WWTW 的 `sludge_process` 可配置 `digestion_mass_reduction_fraction`、`dewat
 ### 3.7 校验并运行
 
 ```powershell
-watermet2 validate path\to\project.json
-watermet2 run path\to\project.json --output output\my_case
+aiuwm validate path\to\project.json
+aiuwm run path\to\project.json --output output\my_case
 ```
 
 先校验能发现缺列、缺日、无效组件、路径断裂和分配比例错误。运行结果包括：
@@ -293,7 +299,7 @@ watermet2 run path\to\project.json --output output\my_case
 
 ## 4. 校准、风险与方案决策
 
-官方 2012 功能需求把部分风险列为 WaterMet² 直接计算，部分列为“间接估算”或建议由外部 DSS 处理。本实现保留这种边界：水量、CSO、旁路、失效、洪涝和补给来自核心物理账本；低压、伤害、生活习惯、低水质等无法由日尺度战略模型直接求解的项目明确标记为 `deterministic_proxy`，可通过 `risk_thresholds` 和 `risk_settings` 配置，不冒充水力或流行病学模型。
+公开功能需求把部分风险列为模型直接计算，部分列为“间接估算”或建议由外部 DSS 处理。本实现保留这种边界：水量、CSO、旁路、失效、洪涝和补给来自核心物理账本；低压、伤害、生活习惯、低水质等无法由日尺度战略模型直接求解的项目明确标记为 `deterministic_proxy`，可通过 `risk_thresholds` 和 `risk_settings` 配置，不冒充水力或流行病学模型。
 
 风险阈值示例：
 
@@ -320,7 +326,7 @@ watermet2 run path\to\project.json --output output\my_case
 观测 CSV 至少含 `date` 和观测列；参数网格、目标表/列及筛选条件参照 `examples/demo_full/calibration.json`：
 
 ```powershell
-watermet2 calibrate examples\demo_full\project.json `
+aiuwm calibrate examples\demo_full\project.json `
   --observed examples\demo_full\observed.csv `
   --spec examples\demo_full\calibration.json `
   --output output\calibration
@@ -343,7 +349,7 @@ watermet2 calibrate examples\demo_full\project.json `
 参照 `examples/demo_full/uncertainty.json` 定义参数路径和 `uniform`、`normal`、`triangular`、`lognormal` 或 `choice` 分布：
 
 ```powershell
-watermet2 uncertainty examples\demo_full\project.json `
+aiuwm uncertainty examples\demo_full\project.json `
   --spec examples\demo_full\uncertainty.json `
   --output output\uncertainty
 ```
@@ -353,7 +359,7 @@ watermet2 uncertainty examples\demo_full\project.json `
 ### 4.4 多准则方案排序
 
 ```powershell
-watermet2 rank `
+aiuwm rank `
   --alternatives examples\demo_full\alternatives.csv `
   --criteria examples\demo_full\criteria.json `
   --p 2 `
@@ -365,13 +371,13 @@ watermet2 rank `
 AHP 与完整 DSS：
 
 ```powershell
-watermet2 ahp-rank `
+aiuwm ahp-rank `
   --alternatives examples\demo_full\alternatives.csv `
   --criteria examples\demo_full\criteria.json `
   --pairwise examples\demo_full\ahp_pairwise.json `
   --output output\ahp_ranking.csv
 
-watermet2 dss examples\demo_full\project.json `
+aiuwm dss examples\demo_full\project.json `
   --spec examples\demo_full\dss.json `
   --output output\dss
 ```
@@ -381,7 +387,7 @@ watermet2 dss examples\demo_full\project.json `
 ### 4.5 多目标 Pareto 优化
 
 ```powershell
-watermet2 optimize examples\demo_full\project.json `
+aiuwm optimize examples\demo_full\project.json `
   --spec examples\demo_full\optimization.json `
   --output output\pareto_trials.csv
 ```
@@ -391,9 +397,9 @@ watermet2 optimize examples\demo_full\project.json `
 ### 4.6 Python Toolkit
 
 ```python
-from watermet2_repro import WaterMet2Toolkit
+from aiuwm import AIUWMToolkit
 
-toolkit = WaterMet2Toolkit.open("examples/demo_full/project.json")
+toolkit = AIUWMToolkit.open("examples/demo_full/project.json")
 toolkit.set_input("components.DM1.leakage_fraction", 0.15)
 toolkit.run()
 dm1 = toolkit.get_result("component_daily", component_id="DM1")
@@ -402,7 +408,7 @@ total_leakage = toolkit.get_result_value("component_daily", "leakage_ml", compon
 toolkit.write_results("output/toolkit_case")
 ```
 
-该接口提供打开/保存工程、读取/修改任意输入和时序列、校验、运行、列举组件、日期筛选、日/周/月/年聚合和标量提取。它提供原 Toolkit 的高层用途，但不声称兼容原 `WaterMet2.dll/Toolkit.dll` ABI 或函数签名。
+该接口提供打开/保存工程、读取/修改任意输入和时序列、校验、运行、列举组件、日期筛选、日/周/月/年聚合和标量提取。它提供同类工具包的高层用途，但不声称兼容任何闭源参考实现的动态库 ABI 或函数签名。
 
 ## 5. 常见问题
 
@@ -410,6 +416,6 @@ toolkit.write_results("output/toolkit_case")
 - **校验提示缺日**：补齐完整日历；未知值不要用删除日期解决，应先插补并记录方法。
 - **供水分配报错**：检查同一区域 `supply_paths.allocation` 是否严格合计为 1。
 - **缺水为零但水源见底**：检查服务水池初始储量、路径能力和模拟起始期的 warm-up 设置。
-- **需要管网压力/管径瞬变**：WaterMet² 是战略代谢模型，不是 EPANET/SWMM 的详细水力替代品。可先用水力模型生成日尺度边界序列，再输入本系统评估长期资源与环境表现。
+- **需要管网压力/管径瞬变**：本框架是战略代谢模型，不是 EPANET/SWMM 的详细水力替代品。可先用水力模型生成日尺度边界序列，再输入本系统评估长期资源与环境表现。
 
 建议保留一份只读基准配置；每个方案使用独立 JSON 和输出目录，并把数据来源、单位、插补、校准区间和参数依据写入项目记录。

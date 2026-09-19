@@ -5,7 +5,7 @@ from zipfile import ZipFile
 
 import httpx
 
-from watermet2_repro.api import create_app
+from aiuwm.api import create_app
 
 
 app = create_app()
@@ -37,7 +37,7 @@ def test_studio_health_and_demo_project() -> None:
 
     studio = request("GET", "/")
     assert studio.status_code == 200
-    assert "WaterMet" in studio.text
+    assert "AI-UWM Studio" in studio.text
 
 
 def test_studio_validate_and_run_short_window() -> None:

@@ -183,7 +183,7 @@ export function ResultsDashboard() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'watermet2-results.zip';
+      link.download = 'aiuwm-results.zip';
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {

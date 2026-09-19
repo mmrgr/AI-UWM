@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from watermet2_repro.sensitivity import morris_sensitivity, sobol_sensitivity
+from aiuwm.sensitivity import morris_sensitivity, sobol_sensitivity
 
 
 def response(values: dict[str, float]) -> float:

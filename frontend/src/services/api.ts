@@ -5,10 +5,10 @@ import type {
   SimulationResponse,
   UncertaintyResponse,
 } from '../types/results';
-import type { TimeSeriesRow, WaterMetProject } from '../types/project';
+import type { TimeSeriesRow, UWMProject } from '../types/project';
 
 interface ProjectPayload {
-  project: WaterMetProject;
+  project: UWMProject;
   timeseries: TimeSeriesRow[];
 }
 

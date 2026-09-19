@@ -28,8 +28,8 @@ import { Palette } from './Palette';
 import { WaterEdge } from './WaterEdge';
 import { WaterNode } from './WaterNode';
 
-const nodeTypes = { watermet: WaterNode };
-const edgeTypes = { watermet: WaterEdge };
+const nodeTypes = { aiuwm: WaterNode };
+const edgeTypes = { aiuwm: WaterEdge };
 
 const layoutColumns: Record<ComponentKind, number> = {
   water_resource: 0,
@@ -172,7 +172,7 @@ export function ModelCanvas() {
   const onDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const kind = event.dataTransfer.getData('application/watermet-node') as ComponentKind;
+      const kind = event.dataTransfer.getData('application/aiuwm-node') as ComponentKind;
       const item = paletteItems.find((candidate) => candidate.nodeType === kind);
       if (!item) return;
       const prefix = {
@@ -195,7 +195,7 @@ export function ModelCanvas() {
       const config = { ...defaultConfig(kind), name: `${item.label} ${sequence}` };
       addNode({
         id,
-        type: 'watermet',
+        type: 'aiuwm',
         position: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
         data: {
           label: `${item.label} ${sequence}`,
@@ -263,7 +263,7 @@ export function ModelCanvas() {
           selectionOnDrag
           multiSelectionKeyCode="Control"
           deleteKeyCode={['Delete', 'Backspace']}
-          defaultEdgeOptions={{ type: 'watermet', animated: true }}
+          defaultEdgeOptions={{ type: 'aiuwm', animated: true }}
         >
           <Background gap={16} size={1} color="var(--grid)" />
           <Controls position="bottom-left" />

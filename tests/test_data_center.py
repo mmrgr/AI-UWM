@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from watermet2_repro.data_center import (
+from aiuwm.data_center import (
     calculate_data_center_plan,
     finalize_data_center_day,
     wet_bulb_temperature_c,

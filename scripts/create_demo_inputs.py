@@ -6,8 +6,8 @@ import copy
 import numpy as np
 import pandas as pd
 
-from watermet2_repro.analysis import summarize_kpis
-from watermet2_repro.full_engine import FullWaterMet2Model, load_project
+from aiuwm.analysis import summarize_kpis
+from aiuwm.full_engine import FullAIUWMModel, load_project
 
 
 def main() -> None:
@@ -31,7 +31,7 @@ def main() -> None:
         }
     )
     frame.to_csv(output / "timeseries.csv", index=False)
-    result = FullWaterMet2Model.from_files(output / "project.json").run()
+    result = FullAIUWMModel.from_files(output / "project.json").run()
     sewer = result.component_daily[result.component_daily["component_id"] == "SEWER1"]
     observed = sewer[["date", "outflow_ml"]].rename(
         columns={"outflow_ml": "observed_sewer_outflow_ml"}
@@ -61,7 +61,7 @@ def main() -> None:
                 target = target[part]
             target[parts[-1]] = value
         record = {"alternative": name}
-        record.update(summarize_kpis(FullWaterMet2Model(scenario, timeseries).run()))
+        record.update(summarize_kpis(FullAIUWMModel(scenario, timeseries).run()))
         scenarios.append(record)
     pd.DataFrame(scenarios).to_csv(output / "alternatives.csv", index=False)
 

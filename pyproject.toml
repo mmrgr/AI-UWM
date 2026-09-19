@@ -3,16 +3,16 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "watermet2-reproduction"
+name = "aiuwm"
 version = "0.1.0"
-description = "Transparent reproduction of Behzadian and Kapelan (2015) WaterMet2"
+description = "Transparent reproduction of Behzadian and Kapelan (2015) AI-UWM"
 requires-python = ">=3.10"
 dependencies = ["numpy>=2.0", "pandas>=2.2", "matplotlib>=3.9"]
 
 [project.scripts]
-watermet2 = "watermet2_repro.cli:main"
-watermet2-api = "watermet2_repro.api:main"
-watermet2-studio = "watermet2_repro.studio:main"
+aiuwm = "aiuwm.cli:main"
+aiuwm-api = "aiuwm.api:main"
+aiuwm-studio = "aiuwm.studio:main"
 
 [project.optional-dependencies]
 test = ["pytest>=8", "httpx>=0.28"]

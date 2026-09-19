@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from watermet2_repro.model import (
+from aiuwm.model import (
     aggregate_results,
     generate_proxy_inputs,
     load_parameters,

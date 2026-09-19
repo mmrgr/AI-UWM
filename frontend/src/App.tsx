@@ -32,7 +32,7 @@ export default function App() {
   const projectInput = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<StudioView>('model');
   const [dark, setDark] = useState(
-    () => localStorage.getItem('watermet-theme') === 'dark',
+    () => localStorage.getItem('aiuwm-theme') === 'dark',
   );
   const project = useProjectStore((state) => state.project);
   const timeseries = useProjectStore((state) => state.timeseries);
@@ -51,7 +51,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    localStorage.setItem('watermet-theme', dark ? 'dark' : 'light');
+    localStorage.setItem('aiuwm-theme', dark ? 'dark' : 'light');
   }, [dark]);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export default function App() {
       } else if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         const current = syncProject();
-        download('watermet2-project.json', JSON.stringify(current, null, 2), 'application/json');
+        download('aiuwm-project.json', JSON.stringify(current, null, 2), 'application/json');
         markSaved();
       }
     };
@@ -96,7 +96,7 @@ export default function App() {
 
   const save = () => {
     const current = syncProject();
-    download('watermet2-project.json', JSON.stringify(current, null, 2), 'application/json');
+    download('aiuwm-project.json', JSON.stringify(current, null, 2), 'application/json');
     download('timeseries.csv', Papa.unparse(timeseries), 'text/csv;charset=utf-8');
     markSaved();
     addLog('项目 JSON 与时间序列 CSV 已下载。');
@@ -113,7 +113,7 @@ export default function App() {
           !('local_areas' in candidate) ||
           !('simulation' in candidate)
         ) {
-          throw new Error('JSON 不是有效的 WaterMet² 项目。');
+          throw new Error('JSON 不是有效的 AI-UWM 项目。');
         }
         loadProject(candidate as typeof project, timeseries);
         setView('model');

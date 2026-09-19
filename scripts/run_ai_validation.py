@@ -4,8 +4,8 @@ import copy
 import json
 from pathlib import Path
 
-from watermet2_repro import (
-    FullWaterMet2Model,
+from aiuwm import (
+    FullAIUWMModel,
     compare_baseline_ai,
     find_ai_carrying_capacity,
     generate_ai_scenario_matrix,
@@ -28,14 +28,14 @@ OUTPUT = ROOT / "validation_artifacts"
 def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     project, timeseries = load_project(EXAMPLE / "project.json")
-    ai_result = FullWaterMet2Model(project, timeseries).run()
+    ai_result = FullAIUWMModel(project, timeseries).run()
     baseline_project = copy.deepcopy(project)
     baseline_project["components"] = {
         key: value
         for key, value in baseline_project["components"].items()
         if value.get("kind") != "data_center"
     }
-    baseline_result = FullWaterMet2Model(baseline_project, timeseries).run()
+    baseline_result = FullAIUWMModel(baseline_project, timeseries).run()
     delta = compare_baseline_ai(baseline_result, ai_result, baseline_project, project)
     delta.to_csv(OUTPUT / "ai_baseline_delta.csv", index=False)
     infrastructure_utilization_summary(ai_result, project).to_csv(

@@ -1,7 +1,7 @@
 export type Scalar = string | number | boolean | null;
 export type ProjectObject = Record<string, unknown>;
 
-export interface WaterMetProject {
+export interface UWMProject {
   name: string;
   simulation: {
     start: string;

@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../../types/checker';
 import type { StudioEdge, StudioNode } from '../../types/nodes';
-import type { TimeSeriesRow, WaterMetProject } from '../../types/project';
+import type { TimeSeriesRow, UWMProject } from '../../types/project';
 
 function numeric(config: Record<string, unknown>, key: string): number | undefined {
   const value = config[key];
@@ -30,7 +30,7 @@ function collectReferencedColumns(value: unknown, columns: Set<string>): void {
 }
 
 export function runDataChecker(
-  project: WaterMetProject,
+  project: UWMProject,
   nodes: StudioNode[],
   edges: StudioEdge[],
   timeseries: TimeSeriesRow[],

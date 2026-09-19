@@ -31,11 +31,11 @@ POST /api/ai/provenance
 ```
 
 ```text
-watermet2 ai-states
-watermet2 ai-industrial
-watermet2 ai-hourly-boundary
-watermet2 ai-robustness
-watermet2 ai-provenance
+aiuwm ai-states
+aiuwm ai-industrial
+aiuwm ai-hourly-boundary
+aiuwm ai-robustness
+aiuwm ai-provenance
 ```
 
 ## 当前仍需目标城市数据完成的部分

@@ -99,7 +99,7 @@ export function DataCenter() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'watermet2-timeseries.csv';
+    link.download = 'aiuwm-timeseries.csv';
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -147,7 +147,7 @@ export function DataCenter() {
         <div>
           <span className="eyebrow">DATA CENTER</span>
           <h1>时间序列数据中心</h1>
-          <p>导入、映射并预览驱动 WaterMet² 的日尺度数据。</p>
+          <p>导入、映射并预览驱动 AI-UWM 的日尺度数据。</p>
         </div>
         <div className="header-actions">
           <Button variant="secondary" icon={<ArrowDownloadRegular />} onClick={exportCsv}>

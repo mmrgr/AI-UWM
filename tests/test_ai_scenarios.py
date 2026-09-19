@@ -3,14 +3,14 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from watermet2_repro.ai_scenarios import (
+from aiuwm.ai_scenarios import (
     apply_ai_scenario,
     compound_hot_drought_scenario,
     generate_ai_scenario_matrix,
     pareto_ai_strategies,
     run_ai_scenario_matrix,
 )
-from watermet2_repro.full_engine import load_project
+from aiuwm.full_engine import load_project
 
 
 def fixture():

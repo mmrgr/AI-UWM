@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from watermet2_repro.model import generate_proxy_inputs, load_parameters, run_scenario
+from aiuwm.model import generate_proxy_inputs, load_parameters, run_scenario
 
 
 PARAMETERS = Path("data/oslo_parameters.json")

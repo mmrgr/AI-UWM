@@ -21,7 +21,7 @@ export function Palette() {
                   draggable
                   title={item.description}
                   onDragStart={(event) => {
-                    event.dataTransfer.setData('application/watermet-node', item.nodeType);
+                    event.dataTransfer.setData('application/aiuwm-node', item.nodeType);
                     event.dataTransfer.effectAllowed = 'move';
                   }}
                 >

@@ -39,7 +39,7 @@ export function SimulationPage({ onShowResults }: SimulationPageProps) {
 
   const run = async () => {
     setStatus('running');
-    addLog('开始运行 WaterMet² 日尺度质量平衡……');
+    addLog('开始运行 AI-UWM 日尺度质量平衡……');
     try {
       const current = syncProject();
       const response = await runSimulation({ project: current, timeseries });

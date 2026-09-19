@@ -1,0 +1,30 @@
+﻿parameter,value,unit,source,evidence_type
+population,1000000,cap,参数域设定: 中等规模城市,assumption
+domestic_demand,165,l_capita_day,GB/T 50331 城市综合用水量标准量级,literature
+industrial_demand,60,ml_day,参数域设定: 一般工业占比,assumption
+irrigation_demand,12,ml_day,参数域设定: 季节灌溉(5-9月),assumption
+municipal_misc_demand,20,ml_day,参数域设定: 市政杂用+景观环境补水(再生水主要用户之一),assumption
+built_up_area,12000,ha,中国百万人口城市建成区 60-120 m2/人,literature
+distribution_leakage,0.12,fraction,CJJ 92 漏损控制区间中位,literature
+wtw_capacity,370 / 380,ml_day,率定: 按峰值日利用率 ~0.78-0.82 反算(城市峰值日需水 ~289 ML/d),calibrated
+wwtw_capacity,270,ml_day,率定: 按峰值日利用率 ~0.82 反算(峰值日污水 ~222 ML/d),calibrated
+reuse_treatment_capacity,40 / 36,ml_day,参数域设定: HA 高回用 / CO 中回用; 取产水量的 1.2 倍作日峰值裕度,assumption
+central_reuse_fraction,0.16 / 0.15,fraction,"按再生水产能反算: 产能/污水量, 使产能利用率落在 90-95%",calibrated
+reservoir_inflow_mean,265 / 290,ml_day,率定: 使弃水率 < 10%、库容年内真实循环(取水量的 1.1-1.26 倍),calibrated
+reservoir_capacity,120000,ml,率定: 年取水量的 1.3-1.4 倍(现实多年调节水库 1-2 倍),calibrated
+reservoir_initial_storage,65000,ml,参数域设定: 起调库容 54%,assumption
+abstraction_capacity,380 / 400,ml_day,率定: 使 0 MW 基线日峰值占用率落在 0.73-0.79,calibrated
+local_connection_capacity,70,ml_day,参数域设定: 园区局部接入能力,assumption
+cooling_storage,24,ml,园区冷却水调蓄: 1000 MW 设计补水量的 ~15 小时(现实 12-72 h),assumption
+grid_connection_capacity,1500 / 2600,MW,参数域设定: 常规 / 能源富集(HA 补充情景),assumption
+ai_load_factor_mean,0.75,fraction,LBNL 2024 利用率区间中位,literature
+training_fraction,0.65,fraction,开题报告 3.3 训练/推理占比设定,assumption
+inference_peak_factor,1.35,fraction,开题报告 3.3 推理峰荷系数设定,assumption
+coc_quality_limits_tds,2200,mg/L,ASHRAE 冷却水处理: 结垢/腐蚀控制量级,literature
+coc_quality_limits_chloride,500,mg/L,ASHRAE 冷却水处理: 不锈钢腐蚀控制量级,literature
+reclaimed_tds,650,mg/L,再生水典型 TDS 量级,assumption
+reclaimed_chloride,130,mg/L,再生水典型氯化物量级,assumption
+potable_tds,180,mg/L,饮用水典型 TDS 量级,assumption
+potable_chloride,35,mg/L,饮用水典型氯化物量级,assumption
+offsite_water_intensity,0.40 / 0.18 / 0.08,L/kWh,LBNL 间接水足迹情景先验,assumption
+driver_series,synthetic,-,"合成分成: 正弦季节 + AR(1) 噪声, 固定种子",synthetic

@@ -1,0 +1,111 @@
+{
+  "capacities_mw": [
+    0,
+    200,
+    400,
+    600,
+    800,
+    1000,
+    1200,
+    1400,
+    1600,
+    1800,
+    2000
+  ],
+  "note": "干预扫描网格; 增益必须与该网格下的 baseline 条目比较",
+  "interventions": [
+    {
+      "name": "baseline",
+      "set": []
+    },
+    {
+      "name": "wtw_plus_10pct",
+      "set": [
+        {
+          "path": "components.WTW1.daily_capacity_ml",
+          "value": 363
+        }
+      ]
+    },
+    {
+      "name": "wtw_plus_20pct",
+      "set": [
+        {
+          "path": "components.WTW1.daily_capacity_ml",
+          "value": 396
+        }
+      ]
+    },
+    {
+      "name": "reuse_plus_50pct",
+      "set": [
+        {
+          "path": "components.CENTRAL_REUSE.treatment_capacity_ml_day",
+          "value": 51.0
+        }
+      ]
+    },
+    {
+      "name": "reuse_plus_100pct",
+      "set": [
+        {
+          "path": "components.CENTRAL_REUSE.treatment_capacity_ml_day",
+          "value": 68.0
+        }
+      ]
+    },
+    {
+      "name": "wwtw_plus_20pct",
+      "set": [
+        {
+          "path": "components.WWTW1.daily_capacity_ml",
+          "value": 312
+        }
+      ]
+    },
+    {
+      "name": "local_connection_plus_50pct",
+      "set": [
+        {
+          "path": "components.AI_DC1.local_connection_capacity_ml_day",
+          "value": 105.0
+        }
+      ]
+    },
+    {
+      "name": "grid_plus_50pct",
+      "set": [
+        {
+          "path": "components.AI_DC1.grid_connection_capacity_mw",
+          "value": 2250
+        }
+      ]
+    },
+    {
+      "name": "leakage_minus_30pct",
+      "set": [
+        {
+          "path": "components.DM1.leakage_fraction",
+          "value": 0.084
+        }
+      ]
+    },
+    {
+      "name": "combined_upgrade",
+      "set": [
+        {
+          "path": "components.WTW1.daily_capacity_ml",
+          "value": 363
+        },
+        {
+          "path": "components.CENTRAL_REUSE.treatment_capacity_ml_day",
+          "value": 51.0
+        },
+        {
+          "path": "components.DM1.leakage_fraction",
+          "value": 0.084
+        }
+      ]
+    }
+  ]
+}

@@ -18,7 +18,7 @@ interface ResultState {
 export const useResultStore = create<ResultState>((set) => ({
   status: 'idle',
   result: null,
-  logs: ['WaterMet² Studio 已就绪。'],
+  logs: ['AI-UWM Studio 已就绪。'],
   error: null,
   frequency: 'daily',
   setStatus: (status) => set({ status }),

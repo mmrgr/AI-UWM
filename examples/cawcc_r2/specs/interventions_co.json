@@ -1,0 +1,140 @@
+{
+  "capacities_mw": [
+    0,
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    800,
+    900,
+    1000,
+    1100,
+    1200,
+    1300,
+    1400,
+    1500,
+    1600,
+    1700,
+    1800,
+    1900,
+    2000
+  ],
+  "note": "干预扫描网格(步长 100 MW); 增益必须与该网格下的 baseline 条目比较; 干预幅度按该域自身基线计算",
+  "baseline": {
+    "wtw_daily_capacity_ml": 380.0,
+    "wwtw_daily_capacity_ml": 270.0,
+    "reuse_treatment_ml_day": 36.0,
+    "local_connection_ml_day": 70.0,
+    "grid_connection_mw": 1500.0
+  },
+  "interventions": [
+    {
+      "name": "baseline",
+      "set": []
+    },
+    {
+      "name": "wtw_plus_10pct",
+      "set": [
+        {
+          "path": "components.WTW1.daily_capacity_ml",
+          "value": 418.0
+        },
+        {
+          "path": "components.WTW1.capacity_ml",
+          "value": 418.0
+        }
+      ]
+    },
+    {
+      "name": "wtw_plus_20pct",
+      "set": [
+        {
+          "path": "components.WTW1.daily_capacity_ml",
+          "value": 456.0
+        },
+        {
+          "path": "components.WTW1.capacity_ml",
+          "value": 456.0
+        }
+      ]
+    },
+    {
+      "name": "reuse_plus_50pct",
+      "set": [
+        {
+          "path": "components.CENTRAL_REUSE.treatment_capacity_ml_day",
+          "value": 54.0
+        }
+      ]
+    },
+    {
+      "name": "reuse_plus_100pct",
+      "set": [
+        {
+          "path": "components.CENTRAL_REUSE.treatment_capacity_ml_day",
+          "value": 72.0
+        }
+      ]
+    },
+    {
+      "name": "wwtw_plus_20pct",
+      "set": [
+        {
+          "path": "components.WWTW1.daily_capacity_ml",
+          "value": 324.0
+        }
+      ]
+    },
+    {
+      "name": "local_connection_plus_50pct",
+      "set": [
+        {
+          "path": "components.AI_DC1.local_connection_capacity_ml_day",
+          "value": 105.0
+        }
+      ]
+    },
+    {
+      "name": "grid_plus_50pct",
+      "set": [
+        {
+          "path": "components.AI_DC1.grid_connection_capacity_mw",
+          "value": 2250.0
+        }
+      ]
+    },
+    {
+      "name": "leakage_minus_30pct",
+      "set": [
+        {
+          "path": "components.DM1.leakage_fraction",
+          "value": 0.084
+        }
+      ]
+    },
+    {
+      "name": "combined_upgrade",
+      "set": [
+        {
+          "path": "components.WTW1.daily_capacity_ml",
+          "value": 418.0
+        },
+        {
+          "path": "components.WTW1.capacity_ml",
+          "value": 418.0
+        },
+        {
+          "path": "components.CENTRAL_REUSE.treatment_capacity_ml_day",
+          "value": 54.0
+        },
+        {
+          "path": "components.DM1.leakage_fraction",
+          "value": 0.084
+        }
+      ]
+    }
+  ]
+}

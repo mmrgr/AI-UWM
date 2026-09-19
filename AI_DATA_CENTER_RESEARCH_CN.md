@@ -1,12 +1,12 @@
-# WaterMet² AI算力—城市水资源承载力研究指南
+# AI-UWM：AI 算力—城市水资源承载力研究指南
 
 ## 1. 研究定位与公开依据
 
-本扩展保留 WaterMet² 的战略级、日尺度、质量守恒建模定位。WaterMet² 原始开放论文将模型定义为用于城市综合水系统长期规划和代谢绩效评估的工具，因此本项目把 AI 数据中心作为城市需求、排水和回用闭环中的一等组件，而不是孤立的 WUE 计算器：
+本框架保持战略级、日尺度、质量守恒的建模定位。公开文献将该类城市水系统性能模型定义为用于城市综合水系统长期规划和代谢绩效评估的工具，因此本项目把 AI 数据中心作为城市需求、排水和回用闭环中的一等组件，而不是孤立的 WUE 计算器：
 
-- [WaterMet² 原始开放论文（DWES, 2014）](https://dwes.copernicus.org/articles/7/63/2014/)
-- [WaterMet² 城市水代谢论文记录](https://repository.uwl.ac.uk/id/eprint/1824/)
-- [Water reuse 与 WaterMet² 综合框架研究](https://pmc.ncbi.nlm.nih.gov/articles/PMC7028841/)
+- [Behzadian 等（2014）：城市水系统定量绩效模型公开论文，DOI 10.5194/dwes-7-63-2014](https://doi.org/10.5194/dwes-7-63-2014)
+- [城市水代谢相关论文记录（UWL 机构库 1824）](https://repository.uwl.ac.uk/id/eprint/1824/)
+- [再生水回用与城市水系统综合框架研究（PMC7028841）](https://pmc.ncbi.nlm.nih.gov/articles/PMC7028841/)
 
 数据中心侧采用“IT容量→负荷→电量→热负荷→冷却→补水”的显式链。美国能源部资料强调冷却塔补水、排污和浓缩倍数对连续冷却负荷的重要性；ASHRAE资料指出再生水水质会影响结垢风险和排污强度。本实现据此提供固定/水质约束 CoC、再生水与饮用水组合及 blowdown 入污水厂，但不虚构复杂化学反应：
 
@@ -56,15 +56,15 @@ CoC = min(DesignCoC, CoCmax)
 ## 4. 直接运行示例
 
 ```powershell
-python -m watermet2_repro.cli validate examples\ai_data_center\project.json
-python -m watermet2_repro.cli run examples\ai_data_center\project.json --output output\ai_city
-python -m watermet2_repro.cli ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100 --output output\ai_capacity_scan.csv
-python -m watermet2_repro.cli ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json --output output\ai_threshold
-python -m watermet2_repro.cli ai-bottlenecks examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json --output output\ai_bottlenecks
-python -m watermet2_repro.cli ai-intraday examples\ai_data_center\project.json --output output\ai_intraday
-python -m watermet2_repro.cli ai-states examples\ai_data_center\project.json --output output\ai_states
-python -m watermet2_repro.cli ai-industrial examples\ai_data_center\project.json --output output\ai_industrial
-python -m watermet2_repro.cli ai-provenance examples\ai_data_center\project.json --output output\ai_provenance
+python -m aiuwm.cli validate examples\ai_data_center\project.json
+python -m aiuwm.cli run examples\ai_data_center\project.json --output output\ai_city
+python -m aiuwm.cli ai-scan examples\ai_data_center\project.json --min-mw 0 --max-mw 2000 --step-mw 100 --output output\ai_capacity_scan.csv
+python -m aiuwm.cli ai-threshold examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json --output output\ai_threshold
+python -m aiuwm.cli ai-bottlenecks examples\ai_data_center\project.json --spec examples\ai_data_center\capacity_constraints.json --output output\ai_bottlenecks
+python -m aiuwm.cli ai-intraday examples\ai_data_center\project.json --output output\ai_intraday
+python -m aiuwm.cli ai-states examples\ai_data_center\project.json --output output\ai_states
+python -m aiuwm.cli ai-industrial examples\ai_data_center\project.json --output output\ai_industrial
+python -m aiuwm.cli ai-provenance examples\ai_data_center\project.json --output output\ai_provenance
 ```
 
 主要产物：
@@ -83,7 +83,7 @@ python -m watermet2_repro.cli ai-provenance examples\ai_data_center\project.json
 Python接口：
 
 ```python
-from watermet2_repro import (
+from aiuwm import (
     compare_baseline_ai, find_ai_carrying_capacity,
     generate_ai_scenario_matrix, morris_sensitivity,
     pareto_ai_strategies, probabilistic_ai_capacity_threshold,

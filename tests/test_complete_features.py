@@ -6,10 +6,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from watermet2_repro.analysis import grid_calibrate, pareto_grid_optimize
-from watermet2_repro.full_engine import FullWaterMet2Model, load_project
-from watermet2_repro.toolkit import WaterMet2Toolkit
-from watermet2_repro.validation import prepare_project
+from aiuwm.analysis import grid_calibrate, pareto_grid_optimize
+from aiuwm.full_engine import FullAIUWMModel, load_project
+from aiuwm.toolkit import AIUWMToolkit
+from aiuwm.validation import prepare_project
 
 
 PROJECT = Path("examples/demo_full/project.json")
@@ -51,7 +51,7 @@ def test_explicit_hierarchy_and_edge_topology() -> None:
     }
     prepared = prepare_project(project)
     assert np.isclose(sum(path["allocation"] for path in prepared["supply_paths"]), 1)
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     assert set(result.subcatchment_daily["subcatchment_id"]) == {"SUB1"}
     assert set(result.indoor_daily["indoor_id"]) == {"HOUSE"}
     assert (result.indoor_daily["water_demand_ml"] > 0).all()
@@ -81,7 +81,7 @@ def test_official_climate_fields_and_selected_rwh_surface() -> None:
     rwh["start_date"] = "2011-01-01"
     rwh["source_surfaces"] = ["roof"]
     rwh["collection_fraction"] = 1.0
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     rwh_rows = result.component_daily[result.component_daily.component_id == "RWH_LOCAL"]
     assert rwh_rows["inflow_ml"].sum() > 0
     assert result.area_daily.iloc[1]["runoff_ml"] == 0
@@ -98,7 +98,7 @@ def test_transmission_sewer_has_no_storage_and_tracks_exfiltration_mass() -> Non
         "exfiltration_fraction": 0.02,
         "exfiltration_to": "RW1",
     })
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     rows = result.component_daily[result.component_daily.component_id == "SEWER1"]
     assert (rows["storage_ml"] == 0).all()
     assert rows["cso_ml"].sum() > 0
@@ -116,7 +116,7 @@ def test_wtw_sludge_and_impact_breakdown() -> None:
     wtw["raw_water_tss_mg_l"] = 15.0
     wtw["tss_removal_fraction"] = 0.9
     wtw["chemical_sludge_yield_kg_per_kg"] = {"alum": 0.26}
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     rows = result.component_daily[result.component_daily.component_id == "WTW1"]
     assert rows["sludge_kg"].sum() > 0
     assert rows["electricity_ghg_kg_co2e"].sum() > 0
@@ -146,7 +146,7 @@ def test_annual_rehabilitation_selects_oldest_cohort_first() -> None:
         "rehabilitation_method": "slip_lining_pe",
         "annual_rehabilitation_length_m": 50,
     }]
-    model = FullWaterMet2Model(project, frame)
+    model = FullAIUWMModel(project, frame)
     result = model.run()
     cohorts = sorted(model.pipeline_state["P"]["cohorts"], key=lambda item: item["age_years"])
     assert [(item["length_m"], item["age_years"]) for item in cohorts] == [
@@ -157,7 +157,7 @@ def test_annual_rehabilitation_selects_oldest_cohort_first() -> None:
 
 def test_toolkit_and_multiscale_aggregated_outputs(tmp_path: Path) -> None:
     project, timeseries = short_project()
-    toolkit = WaterMet2Toolkit(project, timeseries)
+    toolkit = AIUWMToolkit(project, timeseries)
     original = toolkit.get_input("components.DM1.leakage_fraction")
     toolkit.set_input("components.DM1.leakage_fraction", original - 0.01)
     result = toolkit.run()
@@ -207,7 +207,7 @@ def test_groundwater_and_desalination_are_non_storage_resources() -> None:
     resource.pop("inflow_column")
     resource.pop("initial_ml")
     resource.pop("capacity_ml")
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     rows = result.component_daily[result.component_daily.component_id == "WR2"]
     assert rows["outflow_ml"].sum() > 0
     assert (rows["storage_ml"] == 0).all()
@@ -234,7 +234,7 @@ def test_pipeline_addition_and_retirement_material_flows() -> None:
             "length_m": 5,
         },
     ]
-    model = FullWaterMet2Model(project, timeseries)
+    model = FullAIUWMModel(project, timeseries)
     result = model.run()
     assert np.isclose(model.pipeline_state["P"]["length_m"], 105)
     assert set(result.material_events["trigger"]) == {"addition", "retirement"}
@@ -253,7 +253,7 @@ def test_recharge_flooding_and_all_official_risk_codes() -> None:
             "dangerous_velocity_m_s": 0.0,
         }
     )
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     assert result.area_daily["aquifer_recharge_ml"].sum() > 0
     assert result.flood_daily["flooded_area_m2"].sum() > 0
     assert result.flood_daily["high_velocity_flood_area_m2"].sum() > 0
@@ -286,7 +286,7 @@ def test_asset_failure_regression_and_lifecycle_costs() -> None:
             },
         }
     )
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     rows = result.component_daily[result.component_daily.component_id == "DM1"]
     assert rows["capital_cost_eur"].iloc[0] >= 36525.0
     assert rows["maintenance_cost_eur"].sum() > 0
@@ -312,7 +312,7 @@ def test_appliance_energy_cost_and_import_export_accounting() -> None:
     resource["resource_type"] = "imported"
     resource.pop("inflow_column")
     resource["export_fraction"] = 0.1
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     assert result.area_daily["appliance_electricity_kwh"].sum() > 0
     assert result.area_daily["appliance_capital_cost_eur"].sum() == 1000.0
     assert result.system_daily["imported_water_ml"].sum() > 0
@@ -327,7 +327,7 @@ def test_tap_quality_uses_treatment_asset_age_and_reservoir_storage() -> None:
     project["components"]["DM1"].update(
         {"asset_age_years": 50, "quality_decay_per_year": 0.01}
     )
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     quality = result.system_daily["tap_water_quality_index"]
     assert quality.between(0, 1).all()
     assert (quality < 0.95).all()
@@ -340,7 +340,7 @@ def test_tap_quality_uses_treatment_asset_age_and_reservoir_storage() -> None:
 
 def test_calibration_supports_monthly_and_yearly_scales() -> None:
     project, timeseries = short_project(40)
-    baseline = FullWaterMet2Model(project, timeseries).run()
+    baseline = FullAIUWMModel(project, timeseries).run()
     observed = baseline.system_daily.set_index("date")["water_demand_ml"]
     calibrated = grid_calibrate(
         project,
@@ -363,7 +363,7 @@ def test_wwtw_sludge_digestion_dewatering_drying_and_end_use() -> None:
         "dried_dry_solids_fraction": 0.9,
         "end_use_fraction": 0.8,
     }
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     recovery = result.recovery_daily[
         result.recovery_daily.component_id == "WWTW1"
     ].groupby("product")["amount"].sum()

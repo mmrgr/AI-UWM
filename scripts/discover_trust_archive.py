@@ -29,7 +29,7 @@ def main() -> None:
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         results = executor.map(fetch, range(1, 149))
     for item_id, title in results:
-        terms = ("watermet", "dss", "uws performance", "software", "metabolism")
+        terms = ("urban water", "dss", "uws performance", "software", "metabolism")
         if any(term in title.lower() for term in terms):
             print(f"{item_id}: {title}")
 

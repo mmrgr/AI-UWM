@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from watermet2_repro.analysis import (
+from aiuwm.analysis import (
     compromise_programming_rank,
     grid_calibrate,
     monte_carlo,
 )
-from watermet2_repro.full_engine import FullWaterMet2Model, load_project
-from watermet2_repro.validation import ProjectValidationError, validate_project
+from aiuwm.full_engine import FullAIUWMModel, load_project
+from aiuwm.validation import ProjectValidationError, validate_project
 
 
 PROJECT = Path("examples/demo_full/project.json")
@@ -22,7 +22,7 @@ PROJECT = Path("examples/demo_full/project.json")
 @pytest.fixture(scope="module")
 def demo() -> tuple[dict, pd.DataFrame, object]:
     project, timeseries = load_project(PROJECT)
-    result = FullWaterMet2Model(project, timeseries).run()
+    result = FullAIUWMModel(project, timeseries).run()
     return project, timeseries, result
 
 
@@ -93,7 +93,7 @@ def test_infiltration_and_exfiltration_are_in_component_water_balance(
     trial["simulation"]["end"] = str(short_timeseries["date"].iloc[-1].date())
     trial["components"]["SEWER1"]["infiltration_fraction"] = 0.03
     trial["components"]["SEWER1"]["exfiltration_fraction"] = 0.01
-    result = FullWaterMet2Model(trial, short_timeseries).run()
+    result = FullAIUWMModel(trial, short_timeseries).run()
     sewer = result.component_daily[result.component_daily["component_id"] == "SEWER1"]
     residual = (
         sewer["inflow_ml"].sum()
@@ -120,7 +120,7 @@ def test_calibration_uncertainty_and_mcda_interfaces(demo: tuple[dict, pd.DataFr
     short_timeseries = timeseries.iloc[:60].copy()
     short_project = copy.deepcopy(project)
     short_project["simulation"]["end"] = str(short_timeseries["date"].iloc[-1].date())
-    baseline = FullWaterMet2Model(short_project, short_timeseries).run()
+    baseline = FullAIUWMModel(short_project, short_timeseries).run()
     observed = baseline.component_daily[
         baseline.component_daily["component_id"] == "SEWER1"
     ].set_index("date")["outflow_ml"]

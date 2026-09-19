@@ -1,12 +1,12 @@
-# WaterMet² 论文精读与复现报告
+# 城市水系统定量绩效模型：论文精读与复现报告
 
-> 当前工程包含两层实现：`scripts/run_reproduction.py` 用于 Oslo 论文结果的量级与趋势复现；`src/watermet2_repro/full_engine.py` 是覆盖官方手册功能的通用配置驱动引擎。完整能力及边界见 `FUNCTIONAL_COVERAGE_CN.md`，自己的数据接入步骤见中文 `README.md`。
+> 当前工程包含两层实现：`scripts/run_reproduction.py` 用于 Oslo 论文结果的量级与趋势复现；`src/aiuwm/full_engine.py` 是覆盖官方手册功能的通用配置驱动引擎。完整能力及边界见 `FUNCTIONAL_COVERAGE_CN.md`，自己的数据接入步骤见中文 `README.md`。
 
 ## 1. 论文问题与贡献
 
 论文要解决的问题不是管网水力瞬时过程，而是城市水系统在 20-30 年规划期内的整体“代谢”表现：水、能源、材料、化学品、污染物、温室气体、酸化、富营养化和成本如何在供水、用水、雨洪、污水与回用环节之间传递。
 
-WaterMet² 的关键创新有三点：
+该模型方法的关键创新有三点：
 
 1. 将供水、需求、污水/雨洪、循环水与资源回收放入同一日尺度质量平衡；
 2. 用 System → Subcatchment → Local → Indoor 四个尺度表达任意复杂度的城市；
@@ -78,16 +78,16 @@ WaterMet² 的关键创新有三点：
 已核查 ScienceDirect、欧盟 CORDIS、University of Exeter/Figshare、UWL Repository 及 TRUST 官网历史存档。可确认：
 
 - 原始日尺度 SCADA、水源入流、气象、WTW 产水和 WWTW 入流没有随论文公开；
-- D33.2 说明 WaterMet² 是 C#/.NET 闭源程序，核心封装为 `WaterMet2.dll`；
+- D33.2 说明其参考实现是 C#/.NET 闭源程序，核心封装为动态库；
 - 软件当时“通过向开发者申请或 TRUST 网站获取”，当前 TRUST 下载链接失效；
 - Internet Archive/Common Crawl 对相关二进制仅保存了截断对象，无法可靠恢复完整安装包；
-- CORDIS 所列 `iddesc=140` 的历史文件实际为 DSS Strategic Planning 软件，不是 WaterMet² 源码。
+- CORDIS 所列 `iddesc=140` 的历史文件实际为 DSS Strategic Planning 软件，不是该模型的源码。
 
 因此本工程没有伪造“官方原始数据”或冒充原 DLL，而是把全部代理和标定参数显式化。
 
 ## 8. 工程映射
 
-- 模型与方程：`src/watermet2_repro/model.py`
+- 模型与方程：`src/aiuwm/model.py`
 - 论文/手册参数：`data/oslo_parameters.json`
 - 代理数据生成、三场景运行和作图：`scripts/run_reproduction.py`
 - 守恒与干预排序测试：`tests/test_model.py`
@@ -98,7 +98,7 @@ WaterMet² 的关键创新有三点：
 
 - ScienceDirect article: https://www.sciencedirect.com/science/article/pii/S0921344915000798
 - DOI: https://doi.org/10.1016/j.resconrec.2015.03.015
-- CORDIS WaterMet² page: https://cordis.europa.eu/article/id/121974-the-watermet-tool-
-- Exeter/Figshare D33.2: https://uoe.figshare.com/articles/Quantitative_UWS_performance_model_WaterMet2/29706515
+- CORDIS 项目报道：https://cordis.europa.eu/article/id/121974
+- Exeter/Figshare D33.2: https://uoe.figshare.com/articles/Quantitative_UWS_performance_model/29706515
 - Exeter/Figshare Oslo report: https://uoe.figshare.com/articles/Oslo_Case_Study_Report/29701109
 - UWL accepted manuscript: https://repository.uwl.ac.uk/id/eprint/1824/

@@ -1,5 +1,5 @@
 import type { ComponentKind, StudioEdge, StudioNode, WaterFlowType } from '../../types/nodes';
-import type { ProjectObject, WaterMetProject } from '../../types/project';
+import type { ProjectObject, UWMProject } from '../../types/project';
 
 const supplyKinds = new Set<ComponentKind>([
   'water_resource',
@@ -54,7 +54,7 @@ function stringList(value: unknown): string[] {
     : [];
 }
 
-export function projectToGraph(project: WaterMetProject): {
+export function projectToGraph(project: UWMProject): {
   nodes: StudioNode[];
   edges: StudioEdge[];
 } {
@@ -66,7 +66,7 @@ export function projectToGraph(project: WaterMetProject): {
     kinds.set(id, kind);
     nodes.push({
       id,
-      type: 'watermet',
+      type: 'aiuwm',
       position: { x: 80 + (index % 4) * 230, y: 80 + Math.floor(index / 4) * 170 },
       data: {
         label: asString(config.name, id),
@@ -83,7 +83,7 @@ export function projectToGraph(project: WaterMetProject): {
     kinds.set(id, 'local_area');
     nodes.push({
       id,
-      type: 'watermet',
+      type: 'aiuwm',
       position: { x: 80 + (index % 4) * 230, y: 80 + Math.floor(index / 4) * 170 },
       data: {
         label: asString(config.name, id),
@@ -111,7 +111,7 @@ export function projectToGraph(project: WaterMetProject): {
     seen.add(key);
     edges.push({
       id: edgeId(source, target, fallbackIndex),
-      type: 'watermet',
+      type: 'aiuwm',
       source,
       target,
       animated: true,
@@ -194,10 +194,10 @@ export function projectToGraph(project: WaterMetProject): {
 }
 
 export function graphToProject(
-  base: WaterMetProject,
+  base: UWMProject,
   nodes: StudioNode[],
   edges: StudioEdge[],
-): WaterMetProject {
+): UWMProject {
   const components: Record<string, ProjectObject> = {};
   const localAreas: Record<string, ProjectObject> = {};
   const kinds = new Map(nodes.map((node) => [node.id, node.data.nodeType]));

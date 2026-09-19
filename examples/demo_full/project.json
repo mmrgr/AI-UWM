@@ -1,6 +1,6 @@
 {
-  "name": "WaterMet2 complete feature demonstration",
-  "database_file": "../../data/watermet2_database.json",
+  "name": "AI-UWM complete feature demonstration",
+  "database_file": "../../data/uwm_database.json",
   "timeseries_file": "timeseries.csv",
   "simulation": {"start": "2011-01-01", "end": "2012-12-31"},
   "finance": {"base_date": "2011-01-01", "discount_rate": 0.03},

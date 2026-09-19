@@ -1,7 +1,7 @@
-import type { TimeSeriesRow, WaterMetProject } from '../types/project';
+import type { TimeSeriesRow, UWMProject } from '../types/project';
 
-export const defaultProject: WaterMetProject = {
-  name: 'WaterMet² Studio 示例项目',
+export const defaultProject: UWMProject = {
+  name: 'AI-UWM Studio 示例项目',
   simulation: { start: '2025-01-01', end: '2025-01-30' },
   finance: { base_date: '2025-01-01', discount_rate: 0.03 },
   components: {

@@ -42,7 +42,7 @@ export function Titlebar({
         W²
       </div>
       <div className="project-title">
-        <strong>WaterMet² Studio</strong>
+        <strong>AI-UWM Studio</strong>
         <span>{projectName}{dirty ? ' *' : ''}</span>
       </div>
       <div className="titlebar-spacer" />

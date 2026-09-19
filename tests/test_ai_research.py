@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from watermet2_repro.api import create_app
-from watermet2_repro.full_engine import FullWaterMet2Model, load_project
-from watermet2_repro.sensitivity import capacity_exceedance_probability
-from watermet2_repro.cawcc import build_intraday_profile, intraday_peak_proxy, report_constraint_spec
-from watermet2_repro.ai_capacity import scan_ai_capacity, summarize_constraint_boundaries
-from watermet2_repro.research import (
+from aiuwm.api import create_app
+from aiuwm.full_engine import FullAIUWMModel, load_project
+from aiuwm.sensitivity import capacity_exceedance_probability
+from aiuwm.cawcc import build_intraday_profile, intraday_peak_proxy, report_constraint_spec
+from aiuwm.ai_capacity import scan_ai_capacity, summarize_constraint_boundaries
+from aiuwm.research import (
     apply_state_pressure,
     compare_ai_industrial,
     dimensionless_margins,
@@ -31,8 +31,8 @@ def ai_fixture() -> tuple[dict, pd.DataFrame]:
 
 def test_period_aggregation_does_not_sum_ai_ratios() -> None:
     project, timeseries = ai_fixture()
-    result = FullWaterMet2Model(project, timeseries).run()
-    from watermet2_repro.full_engine import _aggregate_frame
+    result = FullAIUWMModel(project, timeseries).run()
+    from aiuwm.full_engine import _aggregate_frame
 
     monthly = _aggregate_frame(
         result.data_center_daily, "MS", ["data_center_id"]

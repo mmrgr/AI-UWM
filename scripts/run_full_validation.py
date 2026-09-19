@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from watermet2_repro.analysis import (
+from aiuwm.analysis import (
     analytic_hierarchy_rank,
     compromise_programming_rank,
     evaluate_decision_problem,
@@ -17,9 +17,9 @@ from watermet2_repro.analysis import (
     pareto_grid_optimize,
     summarize_kpis,
 )
-from watermet2_repro.full_engine import FullWaterMet2Model, load_project
-from watermet2_repro.toolkit import WaterMet2Toolkit
-from watermet2_repro.validation import ProjectValidationError, validate_project
+from aiuwm.full_engine import FullAIUWMModel, load_project
+from aiuwm.toolkit import AIUWMToolkit
+from aiuwm.validation import ProjectValidationError, validate_project
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,15 +77,15 @@ def build_validation_project() -> dict[str, Any]:
     project = json.loads(
         (ROOT / "examples" / "demo_full" / "project.json").read_text(encoding="utf-8")
     )
-    project["name"] = "WaterMet2 synthetic full-flow validation"
-    project["database_file"] = str((ROOT / "data" / "watermet2_database.json").resolve())
+    project["name"] = "AI-UWM synthetic full-flow validation"
+    project["database_file"] = str((ROOT / "data" / "uwm_database.json").resolve())
     project["timeseries_file"] = "synthetic_timeseries.csv"
     project["components"]["SEWER1"]["infiltration_fraction"] = 0.03
     project["components"]["SEWER1"]["exfiltration_fraction"] = 0.01
 
     # Exercise all documented energy carriers and chemicals through the same generic engines.
     database = json.loads(
-        (ROOT / "data" / "watermet2_database.json").read_text(encoding="utf-8")
+        (ROOT / "data" / "uwm_database.json").read_text(encoding="utf-8")
     )
     fuels = {
         name: 0.00001
@@ -295,7 +295,7 @@ def run_validation() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     )
     timeseries.to_csv(OUTPUT / "synthetic_timeseries.csv", index=False)
     project, loaded_timeseries = load_project(OUTPUT / "synthetic_project.json")
-    model = FullWaterMet2Model(project, loaded_timeseries)
+    model = FullAIUWMModel(project, loaded_timeseries)
     result = model.run()
     result.write(OUTPUT / "baseline")
     checks: list[dict[str, Any]] = []
@@ -600,7 +600,7 @@ def run_validation() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         scenario = copy.deepcopy(project)
         for path, value in changes.items():
             set_path(scenario, path, value)
-        scenario_result = FullWaterMet2Model(scenario, loaded_timeseries).run()
+        scenario_result = FullAIUWMModel(scenario, loaded_timeseries).run()
         record = {"alternative": name, **summarize_kpis(scenario_result)}
         record["potable_delivered_ml"] = scenario_result.area_daily.potable_delivered_ml.sum()
         scenarios.append(record)
@@ -610,7 +610,7 @@ def run_validation() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     drought_timeseries[["wr1_inflow_ml", "wr2_inflow_ml"]] = 0.0
     drought_project["components"]["WR1"]["initial_ml"] = 0.0
     drought_project["components"]["WR2"]["initial_ml"] = 0.0
-    drought = FullWaterMet2Model(drought_project, drought_timeseries).run()
+    drought = FullAIUWMModel(drought_project, drought_timeseries).run()
     scenario_frame = pd.DataFrame(scenarios)
     scenario_frame.to_csv(OUTPUT / "alternatives.csv", index=False)
     bau = scenario_frame.set_index("alternative").loc["BAU"]
@@ -642,7 +642,7 @@ def run_validation() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     toolkit_project["simulation"]["end"] = str(
         toolkit_timeseries.date.iloc[-1].date()
     )
-    toolkit = WaterMet2Toolkit(toolkit_project, toolkit_timeseries)
+    toolkit = AIUWMToolkit(toolkit_project, toolkit_timeseries)
     toolkit.run()
     checks.append(check_record(
         "Python Toolkit读写运行检索",
@@ -755,7 +755,7 @@ def write_report(checks: list[dict[str, Any]], summary: dict[str, Any]) -> None:
     )
     status = "通过" if summary["checks_passed"] == summary["checks_total"] else "失败"
     lines = [
-        "# WaterMet² 合成数据全流程验证报告",
+        "# AI-UWM 合成数据全流程验证报告",
         "",
         f"- 总体结果：**{status}**",
         f"- 随机种子：`{summary['seed']}`",
