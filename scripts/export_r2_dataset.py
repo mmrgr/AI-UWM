@@ -92,8 +92,29 @@ def collect_artifacts() -> list[tuple[Path, str, str]]:
 
 
 def safe_sheet(name: str) -> str:
+    """Excel 工作表名单上限 31 字符，且必须唯一。
+
+    注意：不能先截断再追加计数器——若截断后重名（例如
+    literature_benchmark_city_sources / _model / _csv 三者截断到 31 字符后
+    完全相同），追加的 "_2" 会被再次截掉，导致 while 循环永远无法唯一化而
+    **死循环**。正确做法是截断时为后缀预留位置，保证每次迭代都产生新名字。
+    """
     cleaned = "".join(c for c in name if c not in "[]:*?/\\")
     return cleaned[:31]
+
+
+def unique_sheet(name: str, used: set[str]) -> str:
+    base = "".join(c for c in name if c not in "[]:*?/\\")
+    candidate = base[:31]
+    n = 2
+    while candidate in used:
+        suffix = f"~{n}"
+        candidate = base[:31 - len(suffix)] + suffix
+        n += 1
+        if n > 999:  # 理论上不可达，留作兜底防止任何形式的死循环
+            candidate = f"{base[:26]}_{n}"
+            break
+    return candidate
 
 
 def build_key_results() -> pd.DataFrame:
@@ -221,8 +242,14 @@ def build_key_results() -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def sample_timeseries(out: Path, step: int, index_rows: list[dict]) -> dict[str, pd.DataFrame]:
-    """对逐日过程数据做等距抽样，并把月聚合全量拼成一张宽表。"""
+def sample_timeseries(out: Path, step: int, index_rows: list[dict],
+                      component_step: int = 10) -> dict[str, pd.DataFrame]:
+    """对逐日过程数据做等距抽样，并把月聚合全量拼成一张宽表。
+
+    component_daily 是 13 个组件 × 730 天，行数约为 system_daily 的 13 倍，
+    单独成册时若用同一步长会产生 8.8M 单元格的 xlsx（写出极慢、文件近百 MB）。
+    因此组件表默认用更粗的步长（10 日一点），核心表仍用 `step`。
+    """
     manifest_path = TS / "manifest.csv"
     if not manifest_path.exists():
         return {}
@@ -268,7 +295,7 @@ def sample_timeseries(out: Path, step: int, index_rows: list[dict]) -> dict[str,
             try:
                 frame = pd.read_csv(daily, encoding="utf-8-sig")
                 frame.insert(0, "情景", label)
-                component_parts.append(frame.iloc[::step])
+                component_parts.append(frame.iloc[::component_step])
             except Exception:
                 pass
 
@@ -304,7 +331,7 @@ def sample_timeseries(out: Path, step: int, index_rows: list[dict]) -> dict[str,
         combined.to_csv(ts_dir / "component_daily_sampled.csv", index=False, encoding="utf-8-sig")
         result["_component"] = combined
         record("component", "component_daily_sampled.csv",
-               f"{len(combined):,} 行，组件级逐日抽样（单独成册）")
+               f"{len(combined):,} 行，组件级逐日每 {component_step} 日取一点（单独成册）")
 
     size = manifest_path.stat().st_size
     index_rows.append({
@@ -320,7 +347,7 @@ def sample_timeseries(out: Path, step: int, index_rows: list[dict]) -> dict[str,
 
 
 def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int,
-                 sampled: dict[str, pd.DataFrame]) -> None:
+                 sampled: dict[str, pd.DataFrame], component_step: int = 10) -> None:
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = [
         "# AI-UWM R2 实验数据集",
@@ -341,7 +368,8 @@ def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int
         "```",
         "",
         "分册原因：单个 Excel 工作簿有 1,048,576 行上限，逐日全量写 xlsx 会产生 GB 级文件。",
-        f"逐日抽样步长为 **每 {step} 日取一点**；月/年聚合为全量。",
+        f"逐日抽样步长：核心表（system/area/data_center）**每 {step} 日取一点**，"
+        f"组件表 **每 {component_step} 日取一点**（行数约为核心表的 13 倍）；月/年聚合为全量。",
         "",
         "## 数据规模",
         "",
@@ -414,7 +442,9 @@ def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT.parent / "AI-UWM_R2_实验数据集"))
-    parser.add_argument("--daily-step", type=int, default=3, help="逐日抽样步长")
+    parser.add_argument("--daily-step", type=int, default=3, help="逐日抽样步长（核心表）")
+    parser.add_argument("--component-step", type=int, default=10,
+                        help="组件级逐日抽样步长（表最宽，默认比核心表更粗）")
     parser.add_argument("--full-timeseries", action="store_true", help="同时复制逐日全量")
     args = parser.parse_args()
 
@@ -439,7 +469,7 @@ def main() -> None:
             "大小_字节": src.stat().st_size,
         })
 
-    sampled = sample_timeseries(out, args.daily_step, index_rows)
+    sampled = sample_timeseries(out, args.daily_step, index_rows, args.component_step)
 
     if args.full_timeseries and TS.exists():
         dest = out / "timeseries_full"
@@ -467,11 +497,7 @@ def main() -> None:
             used.add("02_情景清单")
         for src, category, desc in rows:
             base = f"{category.replace('/', '_')}_{src.stem}"
-            sheet = safe_sheet(base)
-            n = 2
-            while sheet in used:
-                sheet = safe_sheet(f"{base}_{n}")
-                n += 1
+            sheet = unique_sheet(base, used)
             used.add(sheet)
             try:
                 if src.suffix == ".json":
@@ -491,18 +517,30 @@ def main() -> None:
     if core:
         book2 = out / "AI-UWM_R2_册2_过程.xlsx"
         with pd.ExcelWriter(book2, engine="openpyxl") as writer:
+            used2: set[str] = set()
             for name, frame in core.items():
-                frame.to_excel(writer, sheet_name=safe_sheet(name), index=False)
+                sheet = unique_sheet(name, used2)
+                used2.add(sheet)
+                frame.to_excel(writer, sheet_name=sheet, index=False)
         print(f"册2 -> {book2}")
 
     # ---- 册3 组分（最宽的表单独成册） ---------------------------------------
     if "_component" in sampled:
         book3 = out / "AI-UWM_R2_册3_组分.xlsx"
-        with pd.ExcelWriter(book3, engine="openpyxl") as writer:
-            sampled["_component"].to_excel(writer, sheet_name="component_sampled", index=False)
+        # 组件表有约 62 列、数万行，openpyxl 非流式写出会非常慢，
+        # 因此这里用 write_only 流式模式，只写单元格、不构造样式对象。
+        from openpyxl import Workbook
+
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet("component_sampled")
+        frame = sampled["_component"]
+        ws.append([str(c) for c in frame.columns])
+        for record in frame.itertuples(index=False, name=None):
+            ws.append(list(record))
+        wb.save(book3)
         print(f"册3 -> {book3}")
 
-    write_readme(out, index_rows, key, args.daily_step, sampled)
+    write_readme(out, index_rows, key, args.daily_step, sampled, args.component_step)
     print(f"\n导出完成 -> {out}")
 
 
