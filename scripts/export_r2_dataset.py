@@ -64,7 +64,9 @@ FILE_MAP: dict[str, tuple[str, str]] = {
     "energy_rich_comparison.csv": ("09_能源富集", "能源富集补充情景与常规情景对比"),
     "city_gradient_capacity_scan.csv": ("10_城市梯度", "25 个合成城市 × 41 容量点全量扫描"),
     "city_gradient_cawcc.csv": ("10_城市梯度", "每个合成城市的 CAWCC 与限制约束"),
-    "city_gradient_bottleneck.csv": ("10_城市梯度", "每个合成城市的瓶颈迁移链"),
+    "advanced_city_cawcc.csv": ("10b_边界条件", "「政策已达标」城市的 CAWCC 与限制约束（4 变体 × 2 域）"),
+    "advanced_city_interventions.csv": ("10b_边界条件", "同一干预在达标城市上的增益（结论适用边界）"),
+    "advanced_city_indicators.csv": ("10b_边界条件", "达标变体的城市侧指标复核（确认真的达标了）"),
     "literature_benchmark.csv": ("11_文献对标", "模型 WUE/PUE vs 披露值与行业基准"),
     "literature_benchmark_sources.csv": ("11_文献对标", "对标值来源清单与来源性质"),
     "literature_benchmark_model.csv": ("11_文献对标", "参与对标的模型侧取值"),
@@ -221,6 +223,28 @@ def build_key_results() -> pd.DataFrame:
                 add(domain, "瓶颈分工", "零增益但仍需投资的干预数", len(wasted), "个",
                     f"合计投资中值 {wasted['投资中值_万元'].sum():,.0f} 万元，"
                     f"CAWCC 增益均为 0 MW")
+
+        # ---- 边界条件：政策已达标城市 ---------------------------------------
+        adv = SRC / "advanced_city_cawcc.csv"
+        if adv.exists():
+            df = pd.read_csv(adv, encoding="utf-8-sig")
+            sub = df[df["域"] == domain]
+            base = sub[sub["变体"] == "baseline"]
+            if not base.empty:
+                base_daily = float(base.iloc[0]["CAWCC_日_MW"])
+                for _, r in sub.iterrows():
+                    add(domain, "边界条件(达标城市)",
+                        f"{r['变体']}｜日 CAWCC", r["CAWCC_日_MW"], "MW",
+                        f"相对现状 {r['CAWCC_日_MW'] - base_daily:+.0f} MW；"
+                        f"限制约束 {r['日尺度限制约束']}")
+
+        advi = SRC / "advanced_city_interventions.csv"
+        if advi.exists():
+            df = pd.read_csv(advi, encoding="utf-8-sig")
+            for _, r in df[(df["域"] == domain) & (df["干预"] != "baseline")].iterrows():
+                add(domain, "边界条件(达标城市)",
+                    f"{r['变体']}｜{r['干预']} 增益", r["增益_MW"], "MW",
+                    f"干预后 {r['CAWCC_日_MW']:.0f} MW，限制约束 {r['限制约束']}")
 
         # ---- 城市侧外部效度：模型指标 vs 官方标准/政策锚点 --------------------
         city_cmp = SRC / "literature_benchmark_city.csv"
