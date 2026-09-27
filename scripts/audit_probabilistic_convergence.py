@@ -47,21 +47,52 @@ def load_series(path: Path) -> np.ndarray:
     return pd.to_numeric(frame["maximum_safe_ai_capacity_mw"], errors="coerce").dropna().to_numpy()
 
 
-def collect(domain: str, scratch: Path) -> dict[int, Path]:
-    """Map sample size -> capacity series file, from every available batch."""
-    found: dict[int, Path] = {}
+def load_checkpoint_series(path: Path) -> np.ndarray:
+    """Read a partially completed batch straight from its checkpoint.
+
+    A run that is stopped early never writes ``probabilistic_corrected.csv``,
+    but the checkpoint still holds every finished sample keyed by ``sample_id``.
+    Because the sampler emits samples in strict ``sample_id`` order, the first
+    N records of a longer run are exactly the first N samples of the seed
+    sequence -- so a partial batch is a legitimate, if shorter, prefix point.
+    """
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    by_id = {int(r["sample_id"]): r for r in records}
+    ordered = [by_id[k]["maximum_safe_ai_capacity_mw"] for k in sorted(by_id)]
+    return np.asarray(ordered, dtype=float)
+
+
+def collect(domain: str, scratch: Path) -> dict[int, tuple[Path, bool]]:
+    """Map sample size -> (series file, is_partial), from every available batch.
+
+    Two batches can land on the same sample count -- e.g. a partially completed
+    4096 run whose inherited prefix happens to equal the published 1024 batch.
+    A completed batch is always preferred over a partial one at the same size,
+    otherwise a prefix-only checkpoint would mask the real published result.
+    """
+    found: dict[int, tuple[Path, bool]] = {}
+
+    def offer(size: int, path: Path, is_partial: bool) -> None:
+        existing = found.get(size)
+        if existing is None or (existing[1] and not is_partial):
+            found[size] = (path, is_partial)
+
     published = PUBLISHED / domain / "probabilistic_corrected.csv"
     if published.exists():
-        found[1024] = published
+        offer(1024, published, False)
     if scratch.exists():
+        import pandas as pd
+
         for folder in sorted(scratch.glob("iso*")):
             candidate = folder / domain / "probabilistic_corrected.csv"
-            if not candidate.exists():
+            if candidate.exists():
+                offer(len(pd.read_csv(candidate)), candidate, False)
                 continue
-            import pandas as pd  # noqa: F401
-
-            size = len(pd.read_csv(candidate))
-            found[size] = candidate
+            checkpoint = folder / domain / "probabilistic_corrected_checkpoint.jsonl"
+            if checkpoint.exists():
+                series = load_checkpoint_series(checkpoint)
+                if len(series):
+                    offer(len(series), checkpoint, True)
     return found
 
 
@@ -97,13 +128,18 @@ def main() -> int:
 
         sizes = sorted(batches)
         points: list[dict] = []
+        partial_sizes: list[int] = []
         for size in sizes:
-            series = load_series(batches[size])
+            path, is_partial = batches[size]
+            series = load_series(path) if not is_partial else load_checkpoint_series(path)
+            if is_partial:
+                partial_sizes.append(size)
             n = len(series)
             sd = float(series.std(ddof=1)) if n > 1 else 0.0
             points.append(
                 {
                     "samples": n,
+                    "partial_batch": bool(is_partial),
                     "p05": float(np.quantile(series, 0.05)),
                     "p50": float(np.quantile(series, 0.50)),
                     "p95": float(np.quantile(series, 0.95)),
@@ -147,17 +183,26 @@ def main() -> int:
         }
         passed = all(checks.values())
 
+        if passed and not partial_sizes:
+            statement = "可按'已通过同种子跨样本量收敛判定'表述"
+        elif passed and partial_sizes:
+            statement = (
+                "预声明门槛已通过，但最大批次为部分完成批次（"
+                + ", ".join(str(s) for s in partial_sizes)
+                + "），只能表述为'在已完成样本量范围内稳定'"
+            )
+        else:
+            statement = "只能表述为'条件于最大批次的估计'，不得声称已收敛"
+
         report["domains"][domain] = {
-            "status": "CONVERGED" if passed else "NOT_CONVERGED",
+            "status": "CONVERGED" if (passed and not partial_sizes)
+            else ("CONVERGED_PARTIAL" if passed else "NOT_CONVERGED"),
             "available_sample_sizes": sizes,
+            "partial_batch_sizes": partial_sizes,
             "points": points,
             "mean_se_log_log_slope": slope,
             "checks": checks,
-            "statement": (
-                "可按'已通过同种子跨样本量收敛判定'表述"
-                if passed
-                else "只能表述为'条件于最大批次的估计'，不得声称已收敛"
-            ),
+            "statement": statement,
         }
 
     out = Path(args.out)

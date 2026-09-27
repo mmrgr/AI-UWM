@@ -2,6 +2,7 @@ __pycache__/
 .pytest_cache/
 *.pyc
 tmp/
+.r5check/
 *.egg-info/
 artifacts/
 output/
