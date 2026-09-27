@@ -50,6 +50,29 @@ def scan_ai_capacity(
 _OPERATORS = {"<=": operator.le, "<": operator.lt, ">=": operator.ge, ">": operator.gt, "==": operator.eq}
 
 
+def _constraint_violation(actual: float, definition: dict[str, Any]) -> tuple[bool, float, float]:
+    """Return pass flag, absolute violation and scale-free violation.
+
+    The scale-free value is used only to rank simultaneous failures.  It makes
+    the reported bottleneck independent of the insertion order of the
+    constraint dictionary while preserving the raw ``constraint_margin`` for
+    backwards compatibility.
+    """
+    operation = definition["operator"]
+    target = float(definition["value"])
+    passed = bool(_OPERATORS[operation](actual, target))
+    if passed:
+        return True, 0.0, 0.0
+    if operation.startswith("<"):
+        violation = actual - target
+    elif operation.startswith(">"):
+        violation = target - actual
+    else:  # equality
+        violation = abs(actual - target)
+    scale = abs(target) if abs(target) > 1e-12 else 1.0
+    return False, float(violation), float(violation / scale)
+
+
 def find_ai_carrying_capacity(
     capacity_scan: pd.DataFrame,
     constraints: dict[str, Any],
@@ -62,18 +85,29 @@ def find_ai_carrying_capacity(
     definitions = constraints.get("constraints", constraints)
     if not definitions:
         raise ValueError("at least one carrying-capacity constraint is required")
-    evaluations: list[tuple[bool, str | None, float]] = []
+    evaluations: list[tuple[bool, str | None, float, list[dict[str, Any]]]] = []
     for row in capacity_scan.itertuples(index=False):
-        failed: list[tuple[str, float]] = []
+        failed: list[dict[str, Any]] = []
         for metric, definition in definitions.items():
             operation = definition["operator"]
             if operation not in _OPERATORS or metric not in capacity_scan:
                 raise ValueError(f"Invalid carrying-capacity constraint: {metric} {operation}")
             actual = float(getattr(row, metric))
-            target = float(definition["value"])
-            if not _OPERATORS[operation](actual, target):
-                failed.append((metric, actual - target if operation.startswith("<") else target - actual))
-        evaluations.append((not failed, failed[0][0] if failed else None, failed[0][1] if failed else 0.0))
+            passed, violation, scaled = _constraint_violation(actual, definition)
+            if not passed:
+                failed.append({
+                    "constraint": metric,
+                    "actual": actual,
+                    "target": float(definition["value"]),
+                    "operator": operation,
+                    "violation": violation,
+                    "scaled_violation": scaled,
+                })
+        failed_sorted = sorted(failed, key=lambda item: (-item["scaled_violation"], item["constraint"]))
+        evaluations.append((not failed_sorted,
+                            failed_sorted[0]["constraint"] if failed_sorted else None,
+                            failed_sorted[0]["violation"] if failed_sorted else 0.0,
+                            failed_sorted))
     safe_indices = [index for index, value in enumerate(evaluations) if value[0]]
     failed_indices = [index for index, value in enumerate(evaluations) if not value[0]]
     safe_capacity = float(capacity_scan.iloc[max(safe_indices)]["ai_capacity_mw"]) if safe_indices else None
@@ -99,6 +133,9 @@ def find_ai_carrying_capacity(
     )
     classified = capacity_scan.copy()
     classified["constraint_status"] = ["safe" if item[0] else "high_risk" for item in evaluations]
+    classified["failed_constraints"] = [
+        ";".join(item["constraint"] for item in evaluation[3]) for evaluation in evaluations
+    ]
     if first_failed_index is not None and first_failed_index > 0:
         classified.loc[first_failed_index, "constraint_status"] = "stress"
     threshold_lower = (
@@ -111,6 +148,8 @@ def find_ai_carrying_capacity(
         "first_failed_capacity_mw": first_failed,
         "limiting_constraint": limiting,
         "constraint_margin": margin,
+        "failed_constraints": evaluations[first_failed_index][3] if first_failed_index is not None else [],
+        "limiting_constraint_basis": "maximum scale-free violation at first failed capacity",
         "threshold_interval_mw": [threshold_lower, first_failed],
         "feasible_intervals_mw": intervals,
         "reentrant_feasibility": bool(

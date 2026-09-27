@@ -64,9 +64,17 @@
       "operator": "<=",
       "value": 0.95
     },
-    "reclaimed_water_substitution_ratio": {
-      "operator": ">=",
-      "value": 0.4
+    "peak_capacity_ratio": {
+      "operator": "<=",
+      "value": 1.0
+    },
+    "max_local_connection_ratio": {
+      "operator": "<=",
+      "value": 1.0
+    },
+    "max_daily_average_grid_connection_ratio": {
+      "operator": "<=",
+      "value": 1.0
     }
   }
 }

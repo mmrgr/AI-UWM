@@ -143,3 +143,17 @@ def test_hourly_boundary_margins_robustness_and_provenance() -> None:
     robust = robustness_matrix(project, timeseries, [{"components.AI_DC1.load_factor": 0.8}], [0, 100], {"system_reliability_fraction": {"operator": ">=", "value": 0.99}})
     assert len(robust) == 1
     assert not parameter_provenance(project).empty
+
+
+def test_hourly_capacity_ratio_uses_intraday_factor() -> None:
+    project, timeseries = ai_fixture()
+    scan = hourly_stress_scan(
+        project, timeseries, [0, 100], {"peak_capacity_ratio": {"operator": "<=", "value": 1.0}}
+    )
+    profile = build_intraday_profile()
+    factor = float(profile["load_multiplier"].max() / profile["load_multiplier"].mean())
+    city_ratio = float(scan.loc[scan["ai_capacity_mw"] == 0, "peak_capacity_ratio"].iloc[0])
+    ai_ratio = float(scan.loc[scan["ai_capacity_mw"] == 100, "peak_capacity_ratio"].iloc[0])
+    expected = city_ratio + (ai_ratio - city_ratio) * factor
+    actual = float(scan.loc[scan["ai_capacity_mw"] == 100, "hourly_peak_capacity_ratio"].iloc[0])
+    assert abs(actual - expected) < 1e-12

@@ -16,7 +16,12 @@ def morris_sensitivity(
     trajectories: int = 20,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Compute Morris elementary-effect μ, μ* and σ without external dependencies."""
+    """Compute Morris effects on a common 0–1 input scale.
+
+    Inputs with different physical units cannot be ranked by raw dy/dx.
+    Multiplying by the specified parameter span makes each effect the change
+    in the output per unit change across its *normalized* input range.
+    """
     if trajectories < 2:
         raise ValueError("Morris analysis requires at least two trajectories")
     if not bounds or any(low > high for low, high in bounds.values()):
@@ -34,7 +39,9 @@ def morris_sensitivity(
             changed = dict(base)
             changed[name] = min(high, base[name] + delta) if base[name] <= high - delta else max(low, base[name] - delta)
             actual_delta = changed[name] - base[name]
-            effects[name].append((float(evaluator(changed)) - base_value) / actual_delta)
+            effects[name].append(
+                (float(evaluator(changed)) - base_value) / (actual_delta / (high - low))
+            )
     return pd.DataFrame([
         {"parameter": name, "mu": float(np.mean(values)), "mu_star": float(np.mean(np.abs(values))), "sigma": float(np.std(values, ddof=1))}
         for name, values in effects.items()

@@ -172,14 +172,22 @@ def hourly_stress_scan(
     # `build_intraday_profile` is normalized to a daily mean of one, so the
     # hourly share of a daily total is multiplier / 24.
     peak_multiplier = float(profile["load_multiplier"].max()) / 24.0
-    base = scan_ai_capacity(project, timeseries, capacities_mw=capacities_mw)
+    intra_day_factor = float(profile["load_multiplier"].max()) / float(profile["load_multiplier"].mean())
+    requested = [float(capacity) for capacity in capacities_mw]
+    scanned = scan_ai_capacity(project, timeseries, capacities_mw=sorted(set(requested + [0.0])))
+    city_ratio = float(scanned.loc[scanned["ai_capacity_mw"] == 0.0, "peak_capacity_ratio"].iloc[0])
+    base = scanned[scanned["ai_capacity_mw"].isin(requested)]
     rows: list[dict[str, Any]] = []
     for _, row in base.iterrows():
         record = row.to_dict()
         record["hourly_peak_withdrawal_ml"] = float(row["maximum_daily_withdrawal_ml"]) * peak_multiplier
         record["hourly_peak_consumption_ml"] = float(row["consumption_ml"] / max(len(timeseries), 1)) * peak_multiplier
         record["hourly_city_phase_hours"] = int(city_phase_hours)
-        record["hourly_peak_capacity_ratio"] = float(row["peak_capacity_ratio"]) * peak_multiplier
+        # Only the AI increment follows the AI profile.  Peaking the whole
+        # city baseline would attribute the campus load shape to residents.
+        record["hourly_peak_capacity_ratio"] = city_ratio + (
+            float(row["peak_capacity_ratio"]) - city_ratio
+        ) * intra_day_factor
         record["hourly_system_reliability_fraction"] = float(row["system_reliability_fraction"])
         rows.append(record)
     frame = pd.DataFrame(rows)

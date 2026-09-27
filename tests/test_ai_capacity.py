@@ -60,3 +60,24 @@ def test_nonmonotone_scan_keeps_first_failure_and_all_feasible_intervals() -> No
     assert threshold["maximum_safe_ai_capacity_mw"] == 300
     assert threshold["feasible_intervals_mw"] == [[0, 100], [300, 300]]
     assert threshold["reentrant_feasibility"] is True
+
+
+def test_simultaneous_failures_are_order_independent_and_exposed() -> None:
+    scan = pd.DataFrame({
+        "ai_capacity_mw": [0, 100],
+        "physical": [0.94, 1.00],
+        "policy": [0.66, 0.60],
+    })
+    constraints_a = {
+        "physical": {"operator": "<=", "value": 0.95},
+        "policy": {"operator": ">=", "value": 0.65},
+    }
+    constraints_b = {
+        "policy": {"operator": ">=", "value": 0.65},
+        "physical": {"operator": "<=", "value": 0.95},
+    }
+    a = find_ai_carrying_capacity(scan, constraints_a)
+    b = find_ai_carrying_capacity(scan, constraints_b)
+    assert a["limiting_constraint"] == b["limiting_constraint"] == "policy"
+    assert [item["constraint"] for item in a["failed_constraints"]] == ["policy", "physical"]
+    assert a["capacity_scan"].loc[1, "failed_constraints"] == "policy;physical"

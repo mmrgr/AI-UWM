@@ -6,6 +6,12 @@
     "start": "2029-01-01",
     "end": "2030-12-31"
   },
+  "city_context": {
+    "population": 1000000,
+    "electricity_kwh_per_capita_year": 6000.0,
+    "non_ai_load_column": "city_non_ai_electricity_mw",
+    "load_basis": "synthetic_city_index_scaled_to_annual_per_capita_electricity"
+  },
   "finance": {
     "base_date": "2029-01-01",
     "discount_rate": 0.03

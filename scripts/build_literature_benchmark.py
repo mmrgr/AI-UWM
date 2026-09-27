@@ -205,7 +205,8 @@ CALIBER_WARNINGS = [
 ]
 
 MODEL_SOURCE_NOTE = (
-    "模型值为本轮 AI-UWM 引擎输出：WUE = 取水量(ML)×1000 / IT 能耗(kWh)；"
+    "模型值为本轮 AI-UWM 引擎输出：现场 WUE = 取水量(ML)×1000 / IT 能耗(MWh)，"
+    "即 L/kWh；过程 WUE 另以 external_makeup_ml 计算；"
     "驱动为合成气候序列，不是任何真实城市或真实数据中心。"
 )
 

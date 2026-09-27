@@ -174,18 +174,21 @@ def scan_with_mean(project: dict, timeseries: pd.DataFrame, capacities) -> pd.Da
 
 
 def annual_constraints(domain_constraints: dict) -> dict:
-    """Year-scale constraint set: identical thresholds on annual-mean utilisation."""
+    """Annual-mean analogues of the active daily constraint families."""
     mapping = {
         "max_wtw_utilization": "mean_wtw_utilization",
         "max_wwtw_utilization": "mean_wwtw_utilization",
-        "max_reuse_utilization": "mean_reuse_utilization",
+        "max_source_abstraction_ratio": "mean_source_abstraction_ratio",
+        "peak_capacity_ratio": "mean_total_demand_to_wtw_capacity",
+        "max_local_connection_ratio": "mean_local_connection_ratio",
+        "max_daily_average_grid_connection_ratio": "mean_daily_average_grid_connection_ratio",
     }
     out = {}
-    for name, definition in domain_constraints["constraints"].items():
+    for name, definition in daily_constraints(domain_constraints).items():
         if name in mapping:
             out[mapping[name]] = dict(definition)
         elif name in {"system_reliability_fraction", "domestic_unmet_ml", "unmet_cooling_water_ml",
-                      "max_source_abstraction_ratio", "reclaimed_water_substitution_ratio"}:
+                      "reclaimed_water_substitution_ratio"}:
             out[name] = dict(definition)
     return out
 
@@ -208,18 +211,17 @@ def daily_constraints(domain_constraints: dict) -> dict:
 
 
 def hourly_cawcc(scan: pd.DataFrame, constraints: dict, profile: pd.DataFrame) -> dict:
-    """Hour-scale CAWCC using a dimensionally consistent intra-day peak factor.
-
-    `research.hourly_stress_scan` divides the daily-peak ratio by 24, which
-    compares an hourly flow against a daily capacity and can therefore never
-    fail.  The intra-day peaking factor is (profile max / profile mean) and is
-    applied to the daily-peak statistics directly.
-    """
+    """Hourly proxy: peak only the AI increment above the 0 MW city baseline."""
     multipliers = profile["load_multiplier"].to_numpy(dtype=float)
     intra = float(multipliers.max() / multipliers.mean())
     frame = scan.copy()
-    for column in ("peak_capacity_ratio", "max_local_connection_ratio",
-                   "max_wtw_utilization", "max_reuse_utilization"):
+    baseline = frame.loc[frame["ai_capacity_mw"] == 0]
+    if len(baseline) != 1:
+        raise ValueError("Hourly proxy requires exactly one 0 MW city baseline")
+    for column in ("peak_capacity_ratio", "max_wtw_utilization", "max_reuse_utilization"):
+        city_value = float(baseline.iloc[0][column])
+        frame[f"hourly_{column}"] = city_value + (frame[column].astype(float) - city_value) * intra
+    for column in ("max_local_connection_ratio", "max_daily_average_grid_connection_ratio"):
         frame[f"hourly_{column}"] = frame[column].astype(float) * intra
     definitions = {}
     for name, definition in constraints["constraints"].items():
@@ -231,8 +233,11 @@ def hourly_cawcc(scan: pd.DataFrame, constraints: dict, profile: pd.DataFrame) -
             definitions["hourly_max_wtw_utilization"] = dict(definition)
         elif name == "max_reuse_utilization":
             definitions["hourly_max_reuse_utilization"] = dict(definition)
+        elif name == "max_daily_average_grid_connection_ratio":
+            definitions["hourly_max_daily_average_grid_connection_ratio"] = dict(definition)
         elif name in {"system_reliability_fraction", "domestic_unmet_ml",
-                      "unmet_cooling_water_ml", "reclaimed_water_substitution_ratio"}:
+                      "unmet_cooling_water_ml", "reclaimed_water_substitution_ratio",
+                      "max_source_abstraction_ratio", "max_wwtw_utilization"}:
             definitions[name] = dict(definition)
     positive = frame[frame["ai_capacity_mw"] >= 50].reset_index(drop=True)
     threshold = find_ai_carrying_capacity(positive, {"constraints": definitions})
@@ -305,6 +310,11 @@ def run_domain(domain: str, args) -> dict:
     positive = scan[scan["ai_capacity_mw"] >= 50].reset_index(drop=True)
     day_constraints = {"constraints": daily_constraints(constraints)}
     daily_threshold = find_ai_carrying_capacity(positive, day_constraints)
+    physical_day = {"constraints": {
+        name: definition for name, definition in day_constraints["constraints"].items()
+        if name != "reclaimed_water_substitution_ratio"
+    }}
+    physical_daily_threshold = find_ai_carrying_capacity(positive, physical_day)
     daily_threshold["capacity_scan"].to_csv(folder / "capacity_threshold.csv", index=False)
     boundaries = summarize_constraint_boundaries(positive, day_constraints)
     boundaries.to_csv(folder / "constraint_boundaries.csv", index=False)
@@ -313,11 +323,23 @@ def run_domain(domain: str, args) -> dict:
 
     annual = annual_constraints(constraints)
     annual_threshold = find_ai_carrying_capacity(positive, {"constraints": annual})
+    physical_annual_threshold = find_ai_carrying_capacity(
+        positive, {"constraints": {
+            name: definition for name, definition in annual.items()
+            if name != "reclaimed_water_substitution_ratio"
+        }}
+    )
+    policy_threshold = find_ai_carrying_capacity(
+        positive, {"constraints": {
+            "reclaimed_water_substitution_ratio": day_constraints["constraints"]["reclaimed_water_substitution_ratio"]
+        }}
+    )
     profile = build_intraday_profile(
         training_fraction=0.65, inference_fraction=0.35,
         inference_peak_factor=1.35, peak_hours=range(10, 22),
     )
     hourly = hourly_cawcc(scan, day_constraints, profile)
+    physical_hourly = hourly_cawcc(scan, physical_day, profile)
 
     report["cawcc_daily"] = {
         "maximum_safe_ai_capacity_mw": daily_threshold["maximum_safe_ai_capacity_mw"],
@@ -336,6 +358,26 @@ def run_domain(domain: str, args) -> dict:
         "first_failed_capacity_mw": hourly["first_failed_capacity_mw"],
         "limiting_constraint": hourly["limiting_constraint"],
         "intra_day_peak_factor": hourly["intra_day_peak_factor"],
+    }
+    report["cawcc_physical_daily"] = {
+        k: physical_daily_threshold[k] for k in (
+            "maximum_safe_ai_capacity_mw", "first_failed_capacity_mw", "limiting_constraint"
+        )
+    }
+    report["cawcc_physical_annual"] = {
+        k: physical_annual_threshold[k] for k in (
+            "maximum_safe_ai_capacity_mw", "first_failed_capacity_mw", "limiting_constraint"
+        )
+    }
+    report["cawcc_physical_hourly"] = {
+        k: physical_hourly[k] for k in (
+            "maximum_safe_ai_capacity_mw", "first_failed_capacity_mw", "limiting_constraint"
+        )
+    }
+    report["reclaimed_target_threshold"] = {
+        k: policy_threshold[k] for k in (
+            "maximum_safe_ai_capacity_mw", "first_failed_capacity_mw", "limiting_constraint"
+        )
     }
     boundaries.to_dict("records")
     report["bottleneck_chain"] = boundaries.to_dict("records")
@@ -412,9 +454,12 @@ def run_domain(domain: str, args) -> dict:
             "reclaimed_target_fraction": target,
             "achieved_coc": float(daily["cycles_of_concentration"].mean()),
             "quality_coc_fallback_days": int(daily["quality_coc_fallback"].sum()),
-            "annual_makeup_ml": float(daily["external_makeup_ml"].sum()),
-            "annual_blowdown_ml": float(daily["blowdown_ml"].sum()),
-            "annual_evaporation_ml": float(daily["evaporation_ml"].sum()),
+            "period_makeup_ml": float(daily["external_makeup_ml"].sum()),
+            "period_blowdown_ml": float(daily["blowdown_ml"].sum()),
+            "period_evaporation_ml": float(daily["evaporation_ml"].sum()),
+            "annual_makeup_ml": float(daily["external_makeup_ml"].sum()) / years,
+            "annual_blowdown_ml": float(daily["blowdown_ml"].sum()) / years,
+            "annual_evaporation_ml": float(daily["evaporation_ml"].sum()) / years,
             "actual_reclaimed_fraction": float(daily["actual_reclaimed_fraction"].mean()),
             "freshwater_withdrawal_ml": float(kpis["freshwater_withdrawal_ml"]),
             "reclaimed_water_use_ml": float(kpis["reclaimed_water_use_ml"]),
@@ -551,9 +596,9 @@ def run_domain(domain: str, args) -> dict:
         dc_daily = result.data_center_daily
         tech_rows.append({
             "technology": tech,
-            "wue_l_kwh": float(
-                kpis["total_withdrawal_ml"] * 1000.0 / max(kpis["it_energy_mwh"], 1e-9)
-            ),
+            "site_wue_l_kwh_it": float(kpis["site_wue_l_kwh_it"]),
+            "process_wue_l_kwh_it": float(kpis["process_wue_l_kwh_it"]),
+            "wue_l_kwh": float(kpis["site_wue_l_kwh_it"]),
             "mean_pue": float(dc_daily["pue"].mean()) if not dc_daily.empty else float("nan"),
             "mean_wet_fraction": float(dc_daily["wet_cooling_fraction"].mean()) if not dc_daily.empty else float("nan"),
             # 年化: 模拟期为 years 年, 引擎输出为全期累计

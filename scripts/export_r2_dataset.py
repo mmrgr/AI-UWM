@@ -40,6 +40,11 @@ FILE_MAP: dict[str, tuple[str, str]] = {
     "capacity_threshold.csv": ("04_容量扫描", "承载容量(CAWCC)判定结果与限制约束"),
     "constraint_boundaries.csv": ("04_容量扫描", "各约束的首次失效容量与裕度"),
     "constraint_informativeness.csv": ("04_容量扫描", "约束可失效性诊断（恒真判据识别）"),
+    "capacity_scan_corrected.csv": ("04_容量扫描", "按顺序无关瓶颈逻辑重标注的容量扫描"),
+    "constraint_boundaries_corrected.csv": ("04_容量扫描", "修正后的逐约束首次失效表"),
+    "capacity_threshold_corrected.json": ("04_容量扫描", "修正后的日/年物理承载摘要"),
+    "reservoir_sustainability_corrected.json": ("04_容量扫描", "两年末库容不低于初始库容的可持续性诊断"),
+    "reservoir_multiyear_10y.json": ("04_容量扫描", "10 年合成水文末库容与居民可靠度诊断"),
     "intervention_marginal.csv": ("05_干预与边际", "各类干预方案对 CAWCC 的增益"),
     "reuse_marginal_curve.csv": ("05_干预与边际", "再生水「处理能力」杠杆边际曲线（无效杠杆）"),
     "reuse_production_marginal_curve.csv": ("05_干预与边际", "再生水「产水量」杠杆边际曲线（真杠杆）"),
@@ -55,12 +60,18 @@ FILE_MAP: dict[str, tuple[str, str]] = {
     "morris.csv": ("08_不确定性", "Morris 筛选（AI 侧参数）"),
     "sobol.csv": ("08_不确定性", "Sobol 方差分解（AI 侧参数）"),
     "city_morris.csv": ("08_不确定性", "Morris 筛选（城市侧参数）"),
+    "morris_normalized.csv": ("08_不确定性", "Morris 筛选（AI 侧参数，输入区间归一化）"),
+    "city_morris_normalized.csv": ("08_不确定性", "Morris 筛选（城市侧参数，输入区间归一化）"),
     "city_sobol.csv": ("08_不确定性", "Sobol 方差分解（城市侧参数，未收敛）"),
     "probabilistic_thresholds.csv": ("08_不确定性", "概率承载阈值原始样本（40 样本版）"),
     "probabilistic_summary.json": ("08_不确定性", "概率承载阈值 P05/P50/P95 汇总（40 样本版）"),
-    "probabilistic_large.csv": ("08_不确定性", "概率承载阈值原始样本（1024 样本版）"),
-    "probabilistic_large_summary.json": ("08_不确定性", "1024 样本分位数 + bootstrap 95% CI"),
-    "probabilistic_sample_size_comparison.csv": ("08_不确定性", "40 vs 1024 样本的分位数估计对照"),
+    "probabilistic_large.csv": ("08_不确定性", "概率承载阈值原始样本（历史样本版）"),
+    "probabilistic_large_summary.json": ("08_不确定性", "历史样本分位数 + bootstrap 95% CI"),
+    "probabilistic_corrected.csv": ("08_不确定性", "最终修正版概率承载样本（1024 样本，50 MW 网格，物理/政策阈值分开）"),
+    "probabilistic_corrected_summary.json": ("08_不确定性", "最终修正版概率承载摘要（1024 样本，物理 CAWCC 与政策阈值）"),
+    "probabilistic_grid_audit.json": ("08_不确定性", "自适应容量网格与完整 50 MW 网格对照"),
+    "probabilistic_grid_audit_8.json": ("08_不确定性", "8 个参数抽样点的自适应网格与完整 50 MW 网格对照"),
+    "probabilistic_sample_size_comparison.csv": ("08_不确定性", "同一修订口径下 64 与 1024 样本的分位数和尾部概率对照"),
     "energy_rich_comparison.csv": ("09_能源富集", "能源富集补充情景与常规情景对比"),
     "city_gradient_capacity_scan.csv": ("10_城市梯度", "25 个合成城市 × 41 容量点全量扫描"),
     "city_gradient_cawcc.csv": ("10_城市梯度", "每个合成城市的 CAWCC 与限制约束"),
@@ -70,7 +81,7 @@ FILE_MAP: dict[str, tuple[str, str]] = {
     "realistic_scale_scan.csv": ("10c_现实尺度诊断", "城市规模 × AI 装机的二维重扫（现实区间约束不触发）"),
     "realistic_scale_first_binding.csv": ("10c_现实尺度诊断", "各人口规模下首个触及约束的 AI 装机"),
     "constraint_binding_diagnosis.csv": ("10c_现实尺度诊断", "逐点约束越界诊断（50 MW 步长，全部约束值 + 阈值）"),
-    "experiment_design_audit.csv": ("10c_现实尺度诊断", "实验设计自洽性与现实性硬检查（32 项判定）"),
+    "experiment_design_audit.csv": ("10c_现实尺度诊断", "实验设计自洽性与现实性硬检查（34 项判定）"),
     "literature_benchmark.csv": ("11_文献对标", "模型 WUE/PUE vs 披露值与行业基准"),
     "literature_benchmark_sources.csv": ("11_文献对标", "对标值来源清单与来源性质"),
     "literature_benchmark_model.csv": ("11_文献对标", "参与对标的模型侧取值"),
@@ -88,6 +99,9 @@ def collect_artifacts() -> list[tuple[Path, str, str]]:
     rows: list[tuple[Path, str, str]] = []
     for name, (category, desc) in FILE_MAP.items():
         for domain in ("ha", "co"):
+            if name in ("probabilistic_corrected.csv", "probabilistic_corrected_summary.json") \
+                    and current_probabilistic_summary(domain) is None:
+                continue
             path = SRC / domain / name
             if path.exists():
                 rows.append((path, f"{category}/{domain}", f"[{domain.upper()}] {desc}"))
@@ -95,6 +109,18 @@ def collect_artifacts() -> list[tuple[Path, str, str]]:
         if top.exists():
             rows.append((top, category, desc))
     return rows
+
+
+def current_probabilistic_summary(domain: str) -> Path | None:
+    """Use a probability summary only when it follows the deterministic R4 run."""
+    summary = SRC / domain / "probabilistic_corrected_summary.json"
+    threshold = SRC / domain / "capacity_threshold_corrected.json"
+    verification = SRC / "r2_verification.json"
+    if not all(path.exists() for path in (summary, threshold, verification)):
+        return None
+    if summary.stat().st_mtime < max(threshold.stat().st_mtime, verification.stat().st_mtime):
+        return None
+    return summary
 
 
 def safe_sheet(name: str) -> str:
@@ -139,17 +165,20 @@ def build_key_results() -> pd.DataFrame:
     ver = SRC / "r2_verification.json"
     for domain in ("ha", "co"):
         folder = SRC / domain
+        corrected_threshold = folder / "capacity_threshold_corrected.json"
+        corrected = json.loads(corrected_threshold.read_text(encoding="utf-8")) if corrected_threshold.exists() else {}
 
         if ver.exists():
             vd = json.loads(ver.read_text(encoding="utf-8")).get(domain, {})
-            for key, label in (
-                ("cawcc_annual", "CAWCC(年尺度)"),
-                ("cawcc_daily", "CAWCC(日尺度)"),
-                ("cawcc_hourly", "CAWCC(小时尺度)"),
+            for key, scale, label in (
+                ("cawcc_annual", "annual", "CAWCC(年尺度)"),
+                ("cawcc_daily", "daily", "CAWCC(日尺度)"),
+                ("cawcc_hourly", "hourly", "CAWCC(小时尺度)"),
             ):
-                blk = vd.get(key) or {}
+                blk = corrected.get(scale) or vd.get(key) or {}
+                source = "修正后 50 MW 扫描" if scale in corrected else "历史 R2 产物"
                 add(domain, "承载容量", label, blk.get("maximum_safe_ai_capacity_mw"), "MW",
-                    f"限制约束: {blk.get('limiting_constraint')}")
+                    f"{source}; 限制约束: {blk.get('limiting_constraint')}")
 
         inter = folder / "intervention_marginal.csv"
         if inter.exists():
@@ -162,18 +191,34 @@ def build_key_results() -> pd.DataFrame:
                     note = f"相对同网格 baseline 增益 {r[gain]:+.0f} MW" if gain else ""
                     add(domain, "干预增益", str(r[name]), r[cap], "MW", note)
 
-        psum = folder / "probabilistic_large_summary.json"
-        if psum.exists():
+        psum = current_probabilistic_summary(domain)
+        if psum is not None:
             d = json.loads(psum.read_text(encoding="utf-8"))
             for k in ("p05", "p50", "p95"):
                 ci = d.get(f"{k}_ci95") or [None, None]
-                add(domain, "概率承载", f"CAWCC {k.upper()} (1024 样本)", d.get(k), "MW",
-                    f"bootstrap 95%CI [{ci[0]}, {ci[1]}]; {d.get('samples')} 样本")
+                add(domain, "概率承载", f"CAWCC {k.upper()} ({d.get('samples')} 样本)", d.get(k), "MW",
+                    f"bootstrap 95%CI [{ci[0]}, {ci[1]}]; {d.get('samples')} 样本; 修正版物理 CAWCC")
             exc = d.get("exceedance_probability_ci95") or [None, None]
-            add(domain, "概率承载", "1000 MW 超限概率 (1024 样本)", d.get("exceedance_probability"), "-",
+            add(domain, "概率承载", f"1000 MW 超限概率 ({d.get('samples')} 样本)", d.get("exceedance_probability"), "-",
                 f"bootstrap 95%CI [{exc[0]}, {exc[1]}]")
+            policy = d.get("policy_threshold") or {}
+            for k in ("p05", "p50", "p95"):
+                if k in policy:
+                    ci = policy.get(f"{k}_ci95") or [None, None]
+                    add(domain, "政策合规阈值", f"再生水政策阈值 {k.upper()} ({d.get('samples')} 样本)", policy[k], "MW",
+                        f"bootstrap 95%CI [{ci[0]}, {ci[1]}]; 2000 MW 上界处须检查右删失")
 
-        cm = folder / "city_morris.csv"
+        reservoir = SRC / "reservoir_sustainability_corrected.json"
+        if reservoir.exists():
+            report = json.loads(reservoir.read_text(encoding="utf-8")).get(domain)
+            if report:
+                add(domain, "库容可持续性", "两年末库容不低于初始库容的最大容量",
+                    report.get("max_terminal_non_depleting_capacity_mw"), "MW",
+                    "50 MW 网格；仅为两年合成驱动诊断，不等同多年可靠供水能力")
+
+        cm = folder / "city_morris_normalized.csv"
+        if not cm.exists():
+            cm = folder / "city_morris.csv"
         if cm.exists():
             df = pd.read_csv(cm)
             for metric, sub in df.groupby("metric"):
@@ -382,13 +427,13 @@ def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int
         "",
         f"导出时间：{stamp}",
         "来源：`aiuwm_src/validation_artifacts/`（`r2/` 聚合结果 + `timeseries/` 逐日过程）",
-        "对应方案：《AI-UWM 下一轮模拟：情景设置与实施方案》v4",
+        "对应方案：《AI-UWM 下一轮模拟：情景设置与实施方案》v4.3/R3 修正",
         "",
         "## 交付结构",
         "",
         "```",
         "AI-UWM_R2_实验数据集/",
-        "├── README_数据说明.md          本文件",
+        "├── README_导出索引_自动生成.md    本文件",
         "├── AI-UWM_R2_册1_汇总.xlsx    索引 / 核心结果 / 各实验段聚合表 / 情景清单",
         "├── AI-UWM_R2_册2_过程.xlsx    逐日抽样 + 全情景月聚合",
         "├── AI-UWM_R2_册3_组分.xlsx    组件级逐日抽样（表最宽，单独成册）",
@@ -412,15 +457,15 @@ def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int
         "",
         "## 口径提醒（引用数据时必须遵守）",
         "",
-        "1. 模拟期 **730 天（2 年）**；引擎 `*_ml` 字段为**全期累计**，`*_ml_d` 为**日均值**。",
-        "   与文献年值比较必须先年化（÷2）。",
+        "1. 模拟期 **730 天（2 年）**；未带 `annual_` 前缀的 `*_ml` 字段为**全期累计**，`*_ml_d` 为**日均值**；带 `annual_` 前缀的字段已按模拟年数年化。",
+        "   其余机制字段以导出表字段名为准。",
         "2. 容量扫描网格 0–2000 MW 是**刻意设定的压力测试上界**。",
-        "   现实百万人口城市内的园区为 50–300 MW，**结论引用前必须折算到该区间**。",
-        "3. 驱动为**合成序列**，任何数字都不得表述为真实城市的实测结果。",
-        "4. 规划裕度类判据阈值为 **0.95**（非 1.00）——引擎对能力做硬截断，利用率恒 ≤1。",
+        "   50–300 MW 表示中型园区情景；公开规划已有约 1 GW 级项目，容量需结合项目和电源条件解释。",
+        "3. 驱动为**合成序列**；本批结果是合成驱动下的条件模型估计，城市实测值由率定数据给出。",
+        "4. 硬能力/利用率约束多数采用 **0.95**；峰值、局部接入和电力接网软指标按 **1.00** 判定。",
         "5. 绝对量报 3 位有效数字，无量纲比值保留 3 位小数（见方案 1.5 节）。",
-        "6. **城市梯度的中间城市是两端点的线性混合**，是合成谱而非真实城市，",
-        "   仅用于检验结论沿城市参数轴的连续性与单调性。",
+        "6. **城市梯度的中间城市由两端点线性混合构成**，用于报告瓶颈和指标沿城市参数轴的连续性与单调性；",
+        "   中间点是模型情景，不对应具体城市。",
         "7. 造价与对标数据的**来源性质已分级标注**（见 `05_干预与边际/cost_parameters.csv` 与",
         "   `11_文献对标/literature_benchmark_sources.csv`）：",
         "   OFFICIAL（政府或电网正式文件）/ CASE（具体项目批复或中标）/",
@@ -434,6 +479,14 @@ def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int
         "   人均用水已区分**平均日/最高日**两个口径，只与 GB 50013-2018 同口径定额比对。",
         "10. Pareto 候选集**包含 baseline（投资 0、增益 0）**。若不纳入，零增益但最便宜的选项",
         "    会因无人能支配它而误入有效集——这是判定伪影，不是结果。",
+        "11. `probabilistic_corrected*` 只有在晚于当前 R4 确定性扫描时才纳入本导出；",
+        "    旧 `probabilistic_large*` 是 250 MW 粗网格历史产物。Morris 参数排序只使用 `*_normalized.csv`。",
+        "12. 政策阈值若等于 2000 MW 网格上界，视为右删失下界，不作精确容量估计。",
+        "13. `it_energy_mwh` 与 `facility_energy_mwh` 为 730 天累计 MWh；平均日功率（MW）= 字段 ÷ 730 ÷ 24，接网占用使用设施能耗（含 PUE）。",
+        "14. WUE 分为现场取水 WUE = `external_withdrawal_ml × 1000 / it_energy_mwh`，以及过程补水 WUE = `external_makeup_ml × 1000 / it_energy_mwh`，单位均为 L/kWh；两者不混用。",
+        "15. `city_non_ai_electricity_mw` 是合成城市基线负荷，按人口与年人均用电量缩放 `city_electric_index`；",
+        "    它用于 AI 占城市负荷诊断，`grid_connection_capacity_mw` 仍表示 AI 园区接入容量。",
+        "16. 论文数值以 `aiuwm_src/validation_artifacts/r2` 最新批次为准；本目录为导出快照，重导前按文件时间核对。",
         "",
         "## 文件索引",
         "",
@@ -445,26 +498,28 @@ def write_readme(out: Path, index_rows: list[dict], key: pd.DataFrame, step: int
         "",
         "## 复现方式",
         "",
-        "```bash",
-        "cd aiuwm_src",
-        'export PYTHONPATH="src;scripts"',
+        "```powershell",
+        "Set-Location 'C:\\Users\\mmrgr\\Desktop\\论文\\算力中心\\07_代码_AI-UWM引擎\\aiuwm_src'",
+        "$env:PYTHONPATH='src;scripts'",
         "python scripts/build_r2_domains.py --years 2 --seed 20260918   # 建域",
         "python scripts/audit_realism.py --domains ha,co --ai-capacity 1000        # 审计(须 0 FAIL)",
         "python scripts/calibrate_dry_first.py --domains ha,co --capacity 750",
         "python scripts/run_r2.py --domains ha,co                      # 主矩阵",
         "python scripts/run_r2_sensitivity.py --domains ha,co          # AI 侧敏感性",
         "python scripts/run_r2_extra.py --domains ha,co                # 城市侧敏感性 + 能源富集",
-        "python scripts/run_r2_probabilistic.py --samples 1024 --workers 24   # 大样本概率阈值",
+        "python scripts/run_r2_probabilistic.py --domains ha,co --samples 1024 --workers 24 --bootstrap 2000   # 最终概率批次",
+        "python scripts/audit_probabilistic_grid.py --samples 8        # 两域各 8 点完整网格复核",
+        "python scripts/audit_reservoir_multiyear.py --domains ha,co --years 10 --max-mw 2000 --step-mw 50 --seed 20260918  # 10 年合成水文诊断",
         "python scripts/run_r2_city_gradient.py --grid 5 --workers 16  # 25 城梯度",
         "python scripts/run_r2_cost_pareto.py                          # 成本效益与 Pareto",
         "python scripts/build_literature_benchmark.py                  # 文献对标",
         "python scripts/run_r2_timeseries.py --domains ha,co           # 逐日过程全量落盘",
-        "python scripts/export_r2_dataset.py                           # 本数据集",
+        f"python scripts/export_r2_dataset.py --out '{out}' # 本数据集",
         "```",
         "",
         "种子固定为 `20260918 + 101 × 域序号`，不使用 `hash(str)`（避免 PYTHONHASHSEED 不确定性）。",
     ]
-    (out / "README_数据说明.md").write_text("\n".join(lines), encoding="utf-8")
+    (out / "README_导出索引_自动生成.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def main() -> None:
@@ -480,6 +535,12 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     for stale in out.glob("*.xlsx"):
         stale.unlink()
+    for domain in ("ha", "co"):
+        if current_probabilistic_summary(domain) is None:
+            for name in ("probabilistic_corrected.csv", "probabilistic_corrected_summary.json"):
+                stale = out / "csv" / "08_不确定性" / domain / name
+                if stale.exists():
+                    stale.unlink()
 
     rows = collect_artifacts()
     print(f"采集 {len(rows)} 个产物文件")

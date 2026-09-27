@@ -67,6 +67,8 @@ DOMAINS: dict[str, dict] = {
         "reuse_substitution_target": 0.65,
         "grid_connection_capacity_mw": 1500.0,
         "offsite_water_intensity_l_kwh": 0.40,
+        "population": 1_000_000,
+        "city_electricity_kwh_per_capita_year": 6000.0,
     },
     # 气候凉爽端: 湿球温度低、自然冷却时数长、再生水配置比例中
     "co": {
@@ -94,6 +96,8 @@ DOMAINS: dict[str, dict] = {
         "reuse_substitution_target": 0.40,
         "grid_connection_capacity_mw": 1500.0,
         "offsite_water_intensity_l_kwh": 0.18,
+        "population": 1_000_000,
+        "city_electricity_kwh_per_capita_year": 6000.0,
     },
 }
 
@@ -299,6 +303,11 @@ def build_drivers(domain: dict, start: str, years: int, seed: int) -> pd.DataFra
     weekend = dates.dayofweek.to_numpy() >= 5
     electric = np.where(weekend, electric * 0.90, electric)
     electric = electric / electric.mean()
+    city_base_mw = (
+        float(domain.get("population", 1_000_000))
+        * float(domain.get("city_electricity_kwh_per_capita_year", 6000.0))
+        / (365.0 * 24.0 * 1000.0)
+    )
 
     frame = pd.DataFrame(
         {
@@ -309,6 +318,10 @@ def build_drivers(domain: dict, start: str, years: int, seed: int) -> pd.DataFra
             "reservoir_inflow_ml": np.round(inflow, 2),
             "wet_bulb_c": np.round(twb, 2),
             "city_electric_index": np.round(electric, 4),
+            # Absolute non-AI city load is an explicit denominator for
+            # AI-share and node-余量 diagnostics; the engine still keeps the
+            # AI connection constraint separate from the city baseline.
+            "city_non_ai_electricity_mw": np.round(city_base_mw * electric, 2),
         }
     )
     # --- AI 日负荷系数: 训练基荷 + 推理跟随城市负荷, 耦合强度 alpha_city ----
@@ -329,6 +342,14 @@ def base_project(domain_key: str, domain: dict, years: int = 2) -> dict:
         "ai_database_file": "../../data/ai_data_center_database.json",
         "timeseries_file": "timeseries.csv",
         "simulation": {"start": start, "end": end},
+        "city_context": {
+            "population": int(domain.get("population", 1_000_000)),
+            "electricity_kwh_per_capita_year": float(
+                domain.get("city_electricity_kwh_per_capita_year", 6000.0)
+            ),
+            "non_ai_load_column": "city_non_ai_electricity_mw",
+            "load_basis": "synthetic_city_index_scaled_to_annual_per_capita_electricity",
+        },
         "finance": {"base_date": start, "discount_rate": 0.03},
         "energy_sources": {
             "electricity": {
@@ -581,6 +602,11 @@ def write_specs(out: Path) -> None:
         )
         # 概率/稳健性/小时边界三套规格复用同一组"可失效"约束: 容量类必须
         # 用规划裕度 0.95 而不是 1.00 (引擎硬截断使 <= 1 恒真)。
+        # Physical carrying-capacity constraints and policy compliance are
+        # reported as separate estimands.  The reclaimed-water substitution
+        # target is not a capacity signal because it is nearly constant over
+        # the capacity ladder; keeping it in the physical set would conflate
+        # policy feasibility with resource failure.
         core = {
             name: value for name, value in constraints["constraints"].items()
             # `max_reuse_utilization` 必须排除: 再生水厂配 300 ML 贮池, 日处理
@@ -592,8 +618,15 @@ def write_specs(out: Path) -> None:
                 "unmet_cooling_water_ml", "max_wtw_utilization",
                 "max_wwtw_utilization",
                 "max_source_abstraction_ratio",
-                "reclaimed_water_substitution_ratio",
+                "peak_capacity_ratio",
+                "max_local_connection_ratio",
+                "max_daily_average_grid_connection_ratio",
             }
+        }
+        policy = {
+            "reclaimed_water_substitution_ratio": constraints["constraints"][
+                "reclaimed_water_substitution_ratio"
+            ]
         }
         for template in ("probabilistic_threshold.json", "robustness.json", "hourly_boundary.json"):
             path = specs / template
@@ -601,6 +634,14 @@ def write_specs(out: Path) -> None:
                 continue
             payload = json.loads(path.read_text(encoding="utf-8"))
             payload["constraints"] = dict(core)
+            if template == "probabilistic_threshold.json":
+                payload["policy_constraints"] = dict(policy)
+                # The domain copy is created before the template is rewritten
+                # below on a fresh build.  Set the production grid explicitly
+                # here so a stale 250 MW/9-point template can never leak into
+                # the current per-domain probability specification.
+                payload["capacities_mw"] = list(range(0, 2001, 50))
+                payload["grid_step_mw"] = 50
             (specs / f"{template[:-5]}_{key}.json").write_text(
                 json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
             )
@@ -710,7 +751,10 @@ def write_specs(out: Path) -> None:
             # load_factor 在 timeseries 负荷模式下是死参数, 换成温度系数
             "components.AI_DC1.temperature_coefficient": [0.0005, 0.0080],
         },
-        "capacities_mw": [0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000],
+        # Match the deterministic 50 MW grid.  A coarser grid biases the
+        # threshold downward and can make simultaneous failures look like a
+        # dictionary-order effect.
+        "capacities_mw": list(range(0, 2001, 50)),
         "constraints": {
             "system_reliability_fraction": {"operator": ">=", "value": 0.99},
             "domestic_unmet_ml": {"operator": "<=", "value": 0.0},

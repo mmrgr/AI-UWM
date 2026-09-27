@@ -98,14 +98,22 @@ def city_side(result, project: dict, years: float) -> dict:
     }
 
 
-def ai_side(result, project: dict, years: float) -> dict:
+def ai_side(result, project: dict, years: float, timeseries: pd.DataFrame | None = None) -> dict:
     daily = result.data_center_daily
     kpis = summarize_ai_water_kpis(result, project)
     it_energy = float(kpis["it_energy_mwh"])
     withdrawal = float(kpis["total_withdrawal_ml"])
     mean_pue = float(daily["pue"].mean())
-    city_gwh_year = POPULATION * CITY_ELECTRICITY_KWH_PER_CAPITA_YEAR / 1e6
-    facility_gwh_year = it_energy * mean_pue / 1000.0 / years
+    city_column = str(project.get("city_context", {}).get(
+        "non_ai_load_column", "city_non_ai_electricity_mw"
+    ))
+    if timeseries is not None and city_column in timeseries:
+        city_gwh_year = float(timeseries[city_column].astype(float).mean()) * 365.0 * 24.0 / 1000.0
+    else:
+        # Compatibility path for older project snapshots; new R2 domains carry
+        # the explicit non-AI load column above.
+        city_gwh_year = POPULATION * CITY_ELECTRICITY_KWH_PER_CAPITA_YEAR / 1e6
+    facility_gwh_year = float(kpis["facility_energy_mwh"]) / 1000.0 / years
     return {
         "it_capacity_mw": float(project["components"]["AI_DC1"]["installed_it_capacity_mw"]),
         "mean_pue": mean_pue,
@@ -185,7 +193,7 @@ def main() -> None:
         ai_project = copy.deepcopy(project)
         ai_project["components"]["AI_DC1"]["installed_it_capacity_mw"] = args.ai_capacity
         ai_result = FullAIUWMModel(ai_project, timeseries).run()
-        ai = ai_side(ai_result, ai_project, years)
+        ai = ai_side(ai_result, ai_project, years, timeseries)
 
         print(f"\n{'=' * 78}\n{domain}: city side (no AI)")
         for key, value in city.items():
@@ -230,9 +238,9 @@ def main() -> None:
             check("cooling_storage_hours", ai["cooling_storage_hours"], 12, 72, "h",
                   "园区内冷却水调蓄小时数(现实超大规模园区 12-72 h)"),
             check("ai_electricity_share_of_city", ai["ai_electricity_share_of_city"], 0.05, 0.50, "-",
-                  "园区设施电量/城市全社会用电量; 现实百万人口城市内园区 50-300 MW "
-                  "(0.06-0.38)。本扫描网格 0-2000 MW 是刻意设定的压力测试上界, "
-                  "超出不视为缺陷, 但结论必须折算到现实装机区间。",
+                  "园区设施电量/城市全社会用电量; 50-300 MW 表示中型园区情景, "
+                  "公开规划已有约 1 GW 级项目。本扫描网格 0-2000 MW 是压力测试上界, "
+                  "结论按项目规模和电源条件解释。",
                   intentional=True),
         ]
         frame = pd.DataFrame(checks)

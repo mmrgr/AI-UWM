@@ -61,6 +61,24 @@ def _max_source_abstraction_ratio(
     return maximum
 
 
+def _mean_source_abstraction_ratio(
+    result: FullModelResult, project: dict[str, Any] | None
+) -> float:
+    if not project:
+        return 0.0
+    maximum = 0.0
+    for component_id, component in project.get("components", {}).items():
+        if component.get("kind") != "water_resource":
+            continue
+        capacity = float(component.get("abstraction_capacity_ml_day", 0.0) or 0.0)
+        if capacity <= 0:
+            continue
+        rows = result.component_daily[result.component_daily["component_id"] == component_id]
+        if not rows.empty and "outflow_ml" in rows:
+            maximum = max(maximum, float(rows["outflow_ml"].mean()) / capacity)
+    return maximum
+
+
 def _min_source_storage_ml(
     result: FullModelResult, project: dict[str, Any] | None
 ) -> float:
@@ -102,12 +120,16 @@ def summarize_ai_water_kpis(
     consumption = float(daily["consumption_ml"].sum())
     return_flow = float(daily["return_flow_ml"].sum())
     unmet_ai = float(daily["unmet_cooling_water_ml"].sum())
+    process_column = "external_makeup_ml" if "external_makeup_ml" in daily else "gross_makeup_ml"
+    process_makeup = float(daily[process_column].sum())
     rolling_7 = daily["external_withdrawal_ml"].rolling(7, min_periods=1).mean()
     summer = daily[pd.to_datetime(daily["date"]).dt.month.isin((6, 7, 8))]
     system = result.system_daily
     demand = float(system["water_demand_ml"].sum())
     delivered = float(system["delivered_total_ml"].sum())
-    domestic_unmet = max(0.0, float(system["unmet_demand_ml"].sum()) - unmet_ai)
+    # Household shortage is recorded directly by the allocation engine.  A
+    # system-minus-AI residual also includes industrial and municipal shortage.
+    domestic_unmet = float(result.area_daily["unmet_domestic_ml"].sum()) if "unmet_domestic_ml" in result.area_daily else 0.0
     if domestic_unmet < 1e-9:
         domestic_unmet = 0.0
     supply_capacity = 0.0
@@ -121,7 +143,9 @@ def summarize_ai_water_kpis(
     dc_peak_date = pd.Timestamp(daily.loc[daily["external_withdrawal_ml"].idxmax(), "date"])
     city_peak_date = pd.Timestamp(system.loc[system["water_demand_ml"].idxmax(), "date"])
     local_connection_ratios: list[float] = []
+    mean_local_connection_ratios: list[float] = []
     grid_connection_ratios: list[float] = []
+    mean_grid_connection_ratios: list[float] = []
     if project and not result.data_center_daily.empty:
         for component_id, component in project.get("components", {}).items():
             if component.get("kind") != "data_center":
@@ -141,11 +165,17 @@ def summarize_ai_water_kpis(
                     local_connection_ratios.append(
                         float(area_rows[demand_column].max()) / float(local_capacity)
                     )
+                    mean_local_connection_ratios.append(
+                        float(area_rows[demand_column].mean()) / float(local_capacity)
+                    )
             grid_capacity = component.get("grid_connection_capacity_mw")
             if grid_capacity is not None and float(grid_capacity) > 0:
                 grid_connection_ratios.append(
                     float((rows["facility_energy_mwh"] / 24.0).max())
                     / float(grid_capacity)
+                )
+                mean_grid_connection_ratios.append(
+                    float(rows["facility_energy_mwh"].mean()) / 24.0 / float(grid_capacity)
                 )
     values = {
         "total_withdrawal_ml": withdrawal,
@@ -165,21 +195,35 @@ def summarize_ai_water_kpis(
         "return_ratio": _safe_ratio(return_flow, withdrawal),
         "system_reliability_fraction": _safe_ratio(delivered, demand) if demand else 1.0,
         "domestic_unmet_ml": domestic_unmet,
+        # This is a total-city-demand / potable-WTW-capacity ratio.  Keep the
+        # historical key for reproducibility, but expose the denominator in a
+        # descriptive key so it is not confused with total system capacity.
+        "peak_total_demand_to_wtw_capacity": _safe_ratio(max_system_demand, supply_capacity),
         "peak_capacity_ratio": _safe_ratio(max_system_demand, supply_capacity),
+        "mean_total_demand_to_wtw_capacity": _safe_ratio(float(system["water_demand_ml"].mean()), supply_capacity),
         "coincident_city_ai_peak": float(abs((city_peak_date - dc_peak_date).days) <= 7),
         "max_wtw_utilization": _max_component_utilization(result, project, "wtw", "outflow_ml", ("daily_capacity_ml", "capacity_ml")),
         "max_wwtw_utilization": _max_component_utilization(result, project, "wwtw", "inflow_ml", ("daily_capacity_ml", "capacity_ml")),
         "max_reuse_utilization": _max_component_utilization(result, project, "reuse", "outflow_ml", ("treatment_capacity_ml_day", "capacity_ml")),
         "max_source_abstraction_ratio": _max_source_abstraction_ratio(result, project),
+        "mean_source_abstraction_ratio": _mean_source_abstraction_ratio(result, project),
         "min_source_storage_ml": _min_source_storage_ml(result, project),
         "wastewater_ml": float(result.component_daily.loc[result.component_daily["kind"] == "wwtw", "inflow_ml"].sum()),
         "system_energy_kwh": float(system["electricity_kwh"].sum()),
         "system_carbon_kg_co2e": float(system["ghg_net_kg_co2e"].sum()),
         "it_energy_mwh": float(daily["it_energy_mwh"].sum()),
         "facility_energy_mwh": float(daily["facility_energy_mwh"].sum()),
+        "site_wue_l_kwh_it": _safe_ratio(withdrawal * 1000.0, float(daily["it_energy_mwh"].sum())),
+        "process_wue_l_kwh_it": _safe_ratio(process_makeup * 1000.0, float(daily["it_energy_mwh"].sum())),
+        "wue_l_kwh_it": _safe_ratio(withdrawal * 1000.0, float(daily["it_energy_mwh"].sum())),
         "offsite_electricity_water_ml": float(daily["offsite_electricity_water_ml"].sum()),
         "max_local_connection_ratio": max(local_connection_ratios) if local_connection_ratios else float("nan"),
+        # These are annual/period means in time, while the scalar retains the
+        # most constrained component when several data centres are present.
+        # That matches the daily max metrics used for the infrastructure gate.
+        "mean_local_connection_ratio": max(mean_local_connection_ratios) if mean_local_connection_ratios else float("nan"),
         "max_daily_average_grid_connection_ratio": max(grid_connection_ratios) if grid_connection_ratios else float("nan"),
+        "mean_daily_average_grid_connection_ratio": max(mean_grid_connection_ratios) if mean_grid_connection_ratios else float("nan"),
         "internal_cooling_recovery_ratio": _safe_ratio(
             float(daily["internal_recovery_ml"].sum()),
             float(daily["gross_makeup_ml"].sum()),

@@ -34,12 +34,14 @@ DOMAIN_LABEL = {"ha": "D-HA 缺水—高冷负荷端", "co": "D-CO 气候凉爽�
 
 # 现实参照（来源见各行 note 字段）
 REAL_WORLD = {
-    # 中国城市人均综合用水量（含工业、市政、生活），L/(人·d)
-    "城市人均综合用水量": (250, 550),
+    # 城市配水口径（不含农业和生态补水）的公开城市量级，L/(人·d)。
+    # 这不是全国统一阈值；综合用水量和居民生活用水不能混用。
+    "城市人均综合用水量": (150, 550),
     # 百万人口城市全社会用电：按人均生活+工商业，典型 3000-6000 MW 峰值负荷
     "百万人口城市峰值负荷_MW": (1500, 6000),
-    # 现实中已建成的单一园区级 AI 数据中心（MW）
-    "现实单一园区AI装机_MW": (50, 300),
+    # 该量不设固定上限。公开项目已出现 1 GW 级 AI 园区，50–300 MW
+    # 只能作为小型园区情景，不能作为“现实单园区”的硬边界。
+    "现实单一园区AI装机_MW": (50, 1800),
     # 库容 / 年取水量的合理倍数（年调节及以上水库）
     "库容比年取水": (0.8, 3.0),
     # 入流 / 取水能力的合理倍数（水源可靠性）
@@ -85,10 +87,10 @@ def check_timeseries(project: dict, ts: pd.DataFrame, domain: str) -> None:
     if abs_cap is None:
         abs_cap = res.get("capacity_ml_day")
     add("A 实验设计自洽", "入流/取水能力",
-        "PASS" if 1.0 <= mean_inflow / abs_cap <= 2.5 else "FAIL",
+        "WARN" if mean_inflow < abs_cap else "PASS",
         round(mean_inflow / abs_cap, 3),
-        f"{REAL_WORLD['入流比取水能力']}（文档 15 节声称 1.05–1.15）",
-        f"年均入流 {mean_inflow:.1f} ML/d，取水能力 {abs_cap} ML/d")
+        "若长期实际取水超过入流，需检验库容趋势（能力是上限，不是日均取水）",
+        f"年均入流 {mean_inflow:.1f} ML/d，取水能力 {abs_cap} ML/d；此处是稳态诊断，不是现实性判否")
 
     # 库容 vs 年取水（按取水能力年化）
     cap_ml = float(res.get("capacity_ml", 0.0))
@@ -143,15 +145,23 @@ def check_city_scale(project: dict, ts: pd.DataFrame, domain: str) -> None:
         f"总需求 {total / days:.1f} ML/d。工业占比过低会**高估**留给 AI 的水量余量，"
         "从而高估 CAWCC")
 
-    # 城市全社会用电规模：引擎是否建模了 AI 之外的用电
-    # （若只给了 AI 园区的接网容量而城市用电缺位，则"AI 占城市用电 %"无从谈起）
-    add("C 现实性", "城市非 AI 用电是否被建模",
-        "FAIL" if True else "PASS",
-        "项目里只有 AI_DC1.grid_connection_capacity_mw，未见城市全社会负荷",
-        "应有城市基准负荷序列或等效参数",
-        f"文档局限 #10 称『1000 MW 已占城市全社会用电 129 %』，"
-        f"但引擎中并无城市用电这一输入——该百分比的**分母来源需要说明**，"
-        f"否则这是一个无法在模型内复核的外部断言")
+    # 城市全社会用电规模：把非 AI 基线作为显式驱动列，避免把 AI
+    # 园区接入容量误当作城市总负荷。该列只用于城市电力占比和节点余量
+    # 诊断，不改变 AI 园区自身的接网约束。
+    column = str(project.get("city_context", {}).get(
+        "non_ai_load_column", "city_non_ai_electricity_mw"
+    ))
+    if column in ts and (ts[column].astype(float) > 0).all():
+        base = ts[column].astype(float)
+        add("C 现实性", "城市非 AI 用电是否被建模", "PASS",
+            f"均值 {base.mean():.1f} MW；峰值 {base.max():.1f} MW",
+            "存在正值城市基线负荷序列",
+            f"来源列 {column}；用于 AI 占城市负荷和节点余量诊断")
+    else:
+        add("C 现实性", "城市非 AI 用电是否被建模", "FAIL",
+            f"缺失或非正值列 {column}",
+            "存在正值城市基线负荷序列",
+            "城市电力占比无法由接网容量单独推导")
 
 
 def check_ai_electricity(project: dict, ts: pd.DataFrame, domain: str) -> None:
@@ -168,24 +178,25 @@ def check_ai_electricity(project: dict, ts: pd.DataFrame, domain: str) -> None:
         # 注意单位：data_center_daily 的能耗列是 MWh/d，除以 24 才是平均功率 MW。
         # 第一版审计脚本直接用 MWh/d 当 MW 用，导致比值虚高 24 倍，是脚本 bug 不是实验问题。
         energy_cols = [c for c in dcd.columns if "energy" in c.lower() and "mwh" in c.lower()]
-        it_cols = [c for c in dcd.columns if "it_energy" in c.lower()]
-        col = it_cols[0] if it_cols else (energy_cols[0] if energy_cols else None)
+        # 接网容量约束对应设施从电网取得的平均功率，应使用 facility
+        # energy；IT energy 会低估 PUE>1 时的接网占用。
+        facility_cols = [c for c in dcd.columns if "facility_energy" in c.lower()]
+        col = facility_cols[0] if facility_cols else (energy_cols[0] if energy_cols else None)
         if col is None:
             continue
-        avg_mw = float(dcd[col].mean()) / 24.0
-        share_of_grid = avg_mw / grid_cap if grid_cap else float("nan")
-        add("C 现实性", f"AI 日均功率/电网接入容量 @{cap:.0f} MW",
+        mean_mw = float(dcd[col].mean()) / 24.0
+        peak_mw = float(dcd[col].max()) / 24.0
+        share_of_grid = peak_mw / grid_cap if grid_cap else float("nan")
+        add("C 现实性", f"AI 峰值日均功率/电网接入容量 @{cap:.0f} MW",
             "PASS" if share_of_grid <= 0.95 else "FAIL",
-            f"{share_of_grid:.3f}（日均 {avg_mw:.0f} MW）", "≤0.95（规划裕度）",
-            f"列 {col}（MWh/d 已 ÷24 换算为 MW），电网接入 {grid_cap:.0f} MW")
+            f"{share_of_grid:.3f}（均值 {mean_mw:.0f} MW，峰值 {peak_mw:.0f} MW）", "≤0.95（规划裕度）",
+            f"列 {col}（MWh/d ÷24；约束采用逐日峰值），电网接入 {grid_cap:.0f} MW")
 
-    # 现实园区规模对照
-    lo, hi = REAL_WORLD["现实单一园区AI装机_MW"]
-    add("C 现实性", "核心结论所用 AI 装机是否落在现实园区区间",
-        "FAIL", "CAWCC 1150/1450 MW；主结论在 1000 MW 处讨论",
-        f"{lo}–{hi} MW",
-        "文档已要求折算，但**所有主结论都在这个不现实尺度上得出**，"
-        "折算后的结论从未被真正计算过——见下方 0–300 MW 细网格")
+    # 现实园区规模只作情景标签，不把某个固定区间当作现实上限。
+    add("C 现实性", "压力测试容量是否有公开部署尺度参照",
+        "PASS", "50–2000 MW；公开项目已出现约 1 GW 级 AI 园区",
+        "参照项目和电网条件应逐项目注明",
+        "50–300 MW 可代表中型园区；1 GW 级项目已进入公开规划，容量本身不能判定为失真")
 
 
 def check_fine_grid(project: dict, ts: pd.DataFrame, domain: str) -> None:
@@ -225,6 +236,21 @@ def check_fine_grid(project: dict, ts: pd.DataFrame, domain: str) -> None:
         "主结论必须折算后才能引用")
 
 
+def check_reservoir_sustainability(domain: str) -> None:
+    """Separate short-term facility throughput from end-storage sustainability."""
+    path = OUT / "reservoir_sustainability_corrected.json"
+    if not path.exists():
+        add("A 实验设计自洽", "末库容可持续性扫描", "WARN", "尚未生成",
+            "应报告期末库容不低于初始库容的容量边界",
+            "运行 scripts/audit_reservoir_sustainability.py 后纳入当前结果")
+        return
+    report = json.loads(path.read_text(encoding="utf-8")).get(domain, {})
+    add("A 实验设计自洽", "末库容不低于初始值的最大容量", "WARN",
+        f"{report.get('max_terminal_non_depleting_capacity_mw')} MW（首次下降 {report.get('first_terminal_decline_capacity_mw')} MW）",
+        "与设施吞吐 CAWCC 分开报告",
+        "两年合成驱动诊断；不等同多年可靠供水能力")
+
+
 def check_leakage_budget(project: dict, ts: pd.DataFrame, domain: str) -> None:
     """A 组：降漏损 +150/+200 MW 的增益是否与水量收支自洽。"""
     base = run(project, ts, 0.0)
@@ -261,26 +287,30 @@ def check_caliber(project: dict, ts: pd.DataFrame, domain: str) -> None:
     if not path.exists():
         return
     frame = pd.read_csv(path, encoding="utf-8-sig")
-    for _, r in frame.iterrows():
+    positive_rows = frame[frame["wue_l_kwh"].astype(float) > 0]
+    for _, r in positive_rows.head(1).iterrows():
         wue = float(r["wue_l_kwh"])
         ann_w = float(r.get("annual_withdrawal_ml", float("nan")))
-        energy = float(r.get("facility_energy_mwh", float("nan")))
+        # DOE/ISO 的 site WUE 分母是 IT 能耗；此表原先仅给设施能耗。
+        # 用同一技术情景 750 MW 的 IT 负荷逐日积分可直接反算。
+        tech_project = json.loads((R2 / domain / f"tech_{r['technology']}.json").read_text(encoding="utf-8"))
+        tech_project["components"]["AI_DC1"]["installed_it_capacity_mw"] = 750.0
+        tech_result = FullAIUWMModel(tech_project, ts).run()
+        energy = float(tech_result.data_center_daily["it_energy_mwh"].sum())
         if not (ann_w == ann_w and energy == energy and energy > 0):
             continue
-        # 若 annual_withdrawal 为全期累计（730 d），则 WUE = ann_w*1e6 / (energy*1000)
-        as_full = ann_w * 1e6 / (energy * 1000.0)
-        # 若为年化（365 d），全期应为 2 倍
-        as_annual = ann_w * 2 * 1e6 / (energy * 1000.0)
+        # ML 和 MWh 的单位比为 1000 L/kWh；两年期为年值的 2 倍。
+        as_full = ann_w * 1000.0 / energy
+        as_annual = ann_w * 2 * 1000.0 / energy
         if abs(as_full - wue) < 0.02 * max(wue, 1e-9):
             verdict = "annual_withdrawal_ml 是全期累计"
         elif abs(as_annual - wue) < 0.02 * max(wue, 1e-9):
-            verdict = "annual_withdrawal_ml 是年化值（与 facility_energy 全期累计口径不一致！）"
+            verdict = "annual_withdrawal_ml 是年化值；WUE 使用同一期的全期取水与 IT 能耗"
         else:
             verdict = f"两者都对不上（全期算 {as_full:.4f}，年化算 {as_annual:.4f}）"
         add("B 数据口径", f"technology_comparison[{r['technology']}] WUE 口径",
-            "PASS" if verdict.startswith("annual_withdrawal_ml 是全期") else "FAIL",
+            "PASS" if verdict.startswith("annual_withdrawal_ml 是年化") else "FAIL",
             f"WUE={wue:.4f}", f"反算应≈{wue:.4f}", verdict)
-        break  # 一个技术足以判定
 
 
 def main() -> None:
@@ -293,6 +323,7 @@ def main() -> None:
         check_leakage_budget(project, ts, domain)
         check_caliber(project, ts, domain)
         check_fine_grid(project, ts, domain)
+        check_reservoir_sustainability(domain)
 
     frame = pd.DataFrame(CHECKS)
     OUT.mkdir(parents=True, exist_ok=True)

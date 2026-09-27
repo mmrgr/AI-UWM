@@ -58,11 +58,13 @@ def run_case(project: dict, timeseries: pd.DataFrame, start: float, full: float,
     daily = result.data_center_daily.groupby("date", as_index=False).sum(numeric_only=True)
     series = daily["external_withdrawal_ml"].astype(float)
     mean = float(series.mean())
+    years = max(len(timeseries) / 365.0, 1e-12)
     return {
         "start_c": start,
         "full_c": full,
         "band_width_c": full - start,
-        "annual_withdrawal_ml": float(series.sum()),
+        "period_withdrawal_ml": float(series.sum()),
+        "annual_withdrawal_ml": float(series.sum()) / years,
         "mean_wet_fraction": float(result.data_center_daily["wet_cooling_fraction"].mean()),
         "daily_peak_factor": float(series.max() / mean) if mean > 0 else float("nan"),
         "wet_days_per_year": int((result.data_center_daily["wet_cooling_fraction"] > 0.05).sum()),
