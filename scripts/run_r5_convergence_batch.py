@@ -17,9 +17,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
+
+# Must be set before numpy/BLAS load in this process and in every spawned worker.
+# On a 32-core box OpenBLAS otherwise opens one thread pool per worker; with a
+# handful of workers the combined allocation fails outright with
+# "Memory allocation still failed after 10 retries" even though free RAM looks
+# ample.  Each Monte-Carlo sample is already parallelised across workers, so
+# intra-process BLAS threading buys nothing here.
+for _var in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_var, "1")
 
 import numpy as np
 
