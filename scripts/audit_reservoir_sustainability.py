@@ -71,9 +71,36 @@ def main() -> None:
     parser.add_argument("--domains", default="ha,co")
     parser.add_argument("--max-mw", type=float, default=2000.0)
     parser.add_argument("--step-mw", type=float, default=50.0)
+    parser.add_argument(
+        "--allow-truncated",
+        action="store_true",
+        help=(
+            "Allow a scan ceiling that truncates the published range.  Without "
+            "this flag the script refuses to overwrite the artifact when the "
+            "requested --max-mw is below the published ceiling, because a "
+            "truncated scan silently turns 'no failure found' into a false "
+            "right-censored result."
+        ),
+    )
     args = parser.parse_args()
-    reports = {domain: audit_domain(domain, args.max_mw, args.step_mw) for domain in args.domains.split(",")}
+
     out = ROOT / "validation_artifacts" / "r2" / "reservoir_sustainability_corrected.json"
+    if out.exists() and not args.allow_truncated:
+        previous = json.loads(out.read_text(encoding="utf-8"))
+        published = [
+            block["rows"][-1]["ai_capacity_mw"]
+            for block in previous.values()
+            if block.get("rows")
+        ]
+        ceiling = max(published) if published else 0.0
+        if args.max_mw < ceiling:
+            raise SystemExit(
+                f"拒绝覆盖: --max-mw={args.max_mw:g} 低于已发布扫描上限 {ceiling:g}。"
+                "截断扫描会把'未找到失败点'伪装成右删失。"
+                "如确需截断，加 --allow-truncated。"
+            )
+
+    reports = {domain: audit_domain(domain, args.max_mw, args.step_mw) for domain in args.domains.split(",")}
     out.write_text(json.dumps(reports, ensure_ascii=False, indent=2), encoding="utf-8")
     for report in reports.values():
         print(report["domain"], report["max_terminal_non_depleting_capacity_mw"], report["first_terminal_decline_capacity_mw"])

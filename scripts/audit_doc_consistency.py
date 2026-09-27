@@ -306,6 +306,13 @@ def main() -> int:
             entry = truth.get((tk[0], tk[1]))
             if entry is None:
                 verdict, truth_value, artifact = "UNTRACEABLE", None, ""
+            elif entry["value"] is None:
+                # A ``None`` machine value means the quantity is right-censored:
+                # the scan never produced a first-failure point (e.g. the CO
+                # reclaimed-water policy target).  There is no numeric value to
+                # compare, so report it explicitly instead of crashing and let a
+                # human confirm the document also treats it as a lower bound.
+                verdict, truth_value, artifact = "CENSORED", None, entry["artifact"]
             elif abs(float(entry["value"]) - claim["documented_value"]) < 1e-6:
                 verdict, truth_value, artifact = "PASS", entry["value"], entry["artifact"]
             else:
@@ -344,7 +351,12 @@ def main() -> int:
         print(f"  {r['判定']:12s} {r['论断']}: 文档 {r['文档值']} / 机器 {r['机器值']}")
     print(f"文档中裸露容量数字 {len(sweep)} 处（需人工确认是否已在真值表内）")
 
-    bad = [r for r in rows if r["判定"] != "PASS"]
+    censored = [r for r in rows if r["判定"] == "CENSORED"]
+    bad = [r for r in rows if r["判定"] not in ("PASS", "CENSORED")]
+    if censored:
+        print(f"\n注意: {len(censored)} 条为右删失量（机器无首失点，只能作下界），已登记为非阻断。")
+        for r in censored:
+            print(f"  CENSORED     {r['论断']}: 文档 {r['文档值']} / 机器（右删失）")
     if bad:
         print(f"\nFAIL: {len(bad)} 条论断无法追溯到机器产物")
         return 1
